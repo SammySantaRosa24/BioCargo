@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 function CallToAction() {
   return (
     <section className="cta-section" id="cadastro">
@@ -8,8 +10,8 @@ function CallToAction() {
           <p>Empresas e profissionais especializados, mais perto de onde precisam estar.</p>
         </div>
         <div className="cta-panel__actions">
-          <a className="button button--light" href="#cadastro">Quero me cadastrar <span aria-hidden="true">↗</span></a>
-          <a className="cta-panel__login" href="#login">Já tenho uma conta</a>
+          <Link className="button button--light" to="/cadastro">Quero me cadastrar <span aria-hidden="true">↗</span></Link>
+          <Link className="cta-panel__login" to="/login">Já tenho uma conta</Link>
         </div>
         <span className="cta-panel__orbit cta-panel__orbit--one" aria-hidden="true" />
         <span className="cta-panel__orbit cta-panel__orbit--two" aria-hidden="true" />

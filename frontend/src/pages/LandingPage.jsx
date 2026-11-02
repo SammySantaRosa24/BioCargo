@@ -2,6 +2,7 @@ import BenefitsSection from '../components/BenefitsSection.jsx'
 import CallToAction from '../components/CallToAction.jsx'
 import Footer from '../components/Footer.jsx'
 import Header from '../components/Header.jsx'
+import { Link } from 'react-router-dom'
 import '../styles/landing.css'
 
 function HeroArtwork() {
@@ -40,7 +41,7 @@ function LandingPage() {
               <h1>Conectando empresas a soluções para o <em>transporte biológico.</em></h1>
               <p>A BioCargo aproxima empresas e motoristas PJ especializados para levar materiais biológicos com cuidado, eficiência e confiança.</p>
               <div className="hero-copy__actions">
-                <a className="button button--primary" href="#cadastro">Faça parte da BioCargo <span aria-hidden="true">↗</span></a>
+                <Link className="button button--primary" to="/cadastro">Faça parte da BioCargo <span aria-hidden="true">↗</span></Link>
                 <a className="button button--outline" href="#para-empresas">Conheça a plataforma</a>
               </div>
               <div className="hero-trust"><span className="hero-trust__icon" aria-hidden="true">✳</span><span>Conexões profissionais para uma logística que exige cuidado.</span></div>

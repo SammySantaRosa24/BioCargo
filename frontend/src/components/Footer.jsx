@@ -1,4 +1,5 @@
 import Brand from './Brand.jsx'
+import { Link } from 'react-router-dom'
 
 function Footer() {
   return (
@@ -11,8 +12,8 @@ function Footer() {
         <div className="site-footer__links">
           <a href="#para-empresas">Empresas</a>
           <a href="#para-motoristas">Motoristas PJ</a>
-          <a href="#login">Entrar</a>
-          <a href="#cadastro">Criar conta</a>
+          <Link to="/login">Entrar</Link>
+          <Link to="/cadastro">Criar conta</Link>
         </div>
       </div>
       <div className="container site-footer__bottom">

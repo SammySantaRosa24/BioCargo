@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 const benefits = {
   companies: [
     { number: '01', title: 'Especialistas preparados', description: 'Encontre motoristas PJ com experiência no transporte de materiais biológicos.' },
@@ -46,7 +48,7 @@ function BenefitsSection() {
             <span className="eyebrow">PARA MOTORISTAS PJ</span>
             <h2>Seu próximo caminho começa com uma conexão.</h2>
             <p>Valorize sua experiência e encontre empresas que precisam da sua especialidade.</p>
-            <a className="text-link" href="#cadastro">Quero me conectar <span aria-hidden="true">↗</span></a>
+            <Link className="text-link" to="/cadastro">Quero me conectar <span aria-hidden="true">↗</span></Link>
           </div>
           <BenefitCards items={benefits.drivers} />
         </div>

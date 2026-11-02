@@ -1,4 +1,5 @@
 import Brand from './Brand.jsx'
+import { Link } from 'react-router-dom'
 
 function Header() {
   return (
@@ -10,8 +11,8 @@ function Header() {
           <a href="#para-motoristas">Motoristas PJ</a>
         </nav>
         <div className="site-header__actions">
-          <a className="button button--text" href="#login">Entrar</a>
-          <a className="button button--small" href="#cadastro">Criar conta <span aria-hidden="true">↗</span></a>
+          <Link className="button button--text" to="/login">Entrar</Link>
+          <Link className="button button--small" to="/cadastro">Criar conta <span aria-hidden="true">↗</span></Link>
         </div>
       </div>
     </header>
