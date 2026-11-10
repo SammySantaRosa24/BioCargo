@@ -73,7 +73,8 @@ Este documento descreve o esquema registrado em [`01_schema.sql`](./01_schema.sq
 | `marca` | `VARCHAR(100)` | SIM | — | Marca do veículo. |
 | `modelo` | `VARCHAR(100)` | SIM | — | Modelo do veículo. |
 | `ano` | `INT` | SIM | — | Ano do veículo. O SQL não define faixa de valores. |
-| `disponivel` | `BOOLEAN` | SIM | `DEFAULT FALSE` | Indicador de disponibilidade do veículo; assume `FALSE` quando não informado. |
+| `disponivel` | `BOOLEAN` | SIM | `DEFAULT FALSE` | Indicador de disponibilidade operacional do veículo; assume `FALSE` quando não informado. |
+| `ativo` | `BOOLEAN` | SIM | `DEFAULT TRUE` | Indica se o veículo está ativo; veículos inativos permanecem no histórico e não aparecem em buscas de disponibilidade nem podem ser selecionados em novos interesses. |
 
 ### `interesse`
 
@@ -83,8 +84,12 @@ Este documento descreve o esquema registrado em [`01_schema.sql`](./01_schema.sq
 | `empresa_id` | `INT` | SIM | Chave estrangeira `fk_interesse_empresa` → `empresa(id)` | Empresa relacionada ao interesse. |
 | `motorista_id` | `INT` | SIM | Chave estrangeira `fk_interesse_motorista` → `motorista(id)` | Motorista relacionado ao interesse. |
 | `veiculo_id` | `INT` | NÃO | Chave estrangeira `fk_interesse_veiculo` → `veiculo(id)` | Veículo opcional relacionado ao interesse. Quando preenchido, deve referenciar um veículo existente. |
-| `status` | `ENUM('PENDENTE', 'ACEITO', 'RECUSADO')` | SIM | `ENUM`; `DEFAULT 'PENDENTE'` | Estado do interesse, limitado aos valores indicados; assume `PENDENTE` quando não informado. |
+| `status` | `ENUM('PENDENTE', 'ACEITO', 'RECUSADO', 'EXPIRADO', 'CANCELADO')` | SIM | `ENUM`; `DEFAULT 'PENDENTE'` | Estado do interesse, limitado aos valores indicados; assume `PENDENTE` quando não informado. |
 | `data_criacao` | `DATETIME` | SIM | `DEFAULT CURRENT_TIMESTAMP` | Data e hora de criação do interesse, preenchidas com o horário corrente quando não informadas. |
+| `data_limite_resposta` | `DATETIME` | SIM | — | Prazo de resposta: 24 horas após a criação do interesse. |
+| `cancelado_por` | `ENUM('EMPRESA', 'MOTORISTA')` | NÃO | `ENUM` | Participante que cancelou o interesse; preenchido em cancelamentos. |
+| `observacao_cancelamento` | `TEXT` | NÃO | — | Justificativa obrigatória quando o motorista cancela; não exigida para cancelamento pela empresa. |
+| `data_cancelamento` | `DATETIME` | NÃO | — | Data e hora em que ocorreu o cancelamento. |
 
 ## 4. Regras de negócio relacionadas ao banco
 
@@ -94,7 +99,7 @@ Este documento descreve o esquema registrado em [`01_schema.sql`](./01_schema.sq
 - `empresa.cnpj` é obrigatório e único.
 - `motorista.cpf` e `motorista.cnpj` são obrigatórios e únicos, cada um em sua coluna.
 - Os perfis de usuário são limitados pelo `ENUM` a `EMPRESA`, `MOTORISTA` e `ADMIN`.
-- O estado de interesse é limitado pelo `ENUM` a `PENDENTE`, `ACEITO` e `RECUSADO`.
+- O estado de interesse é limitado pelo `ENUM` a `PENDENTE`, `ACEITO`, `RECUSADO`, `EXPIRADO` e `CANCELADO`.
 - As chaves estrangeiras exigem que os registros referenciados existam.
 - `interesse.veiculo_id` é opcional; os demais campos de referência de `interesse` são obrigatórios.
 
@@ -106,6 +111,9 @@ Este documento descreve o esquema registrado em [`01_schema.sql`](./01_schema.sq
 - Um motorista PJ pode cadastrar vários veículos.
 - Um motorista pode possuir várias qualificações.
 - Um interesse relaciona uma empresa a um motorista e pode indicar um veículo opcionalmente.
+- A empresa cancela somente interesses pendentes, sem justificativa obrigatória; o motorista cancela somente interesses aceitos, com justificativa obrigatória.
+- O interesse expira automaticamente após 24 horas sem resposta. Interesses recusados, expirados ou cancelados permanecem no histórico. Uma nova solicitação pode ser criada após esses estados se o motorista estiver disponível.
+- Veículos inativos não aparecem nas buscas de disponibilidade nem podem ser selecionados em novos interesses; registros históricos são preservados.
 - Um `ADMIN` autorizado realiza a inativação lógica do usuário por `usuario.status = FALSE`; ela bloqueia o acesso e preserva registros e histórico. O fluxo normal não realiza exclusões físicas de usuários ou registros históricos.
 
 Essas regras de negócio não são todas garantidas pelo SQL. As restrições que o banco realmente impõe estão listadas na seção anterior; as regras que exigem validação ou política de aplicação são detalhadas nas observações técnicas. As relações de um motorista para veículos e qualificações são compatíveis com o SQL: as respectivas tabelas guardam `motorista_id` sem restrição `UNIQUE`. O relacionamento do interesse com empresa, motorista e veículo é representado pelas chaves estrangeiras declaradas.
@@ -120,9 +128,11 @@ Essas regras de negócio não são todas garantidas pelo SQL. As restrições qu
 - A exclusividade do perfil `EMPRESA` ou `MOTORISTA` é uma regra aprovada, mas os `UNIQUE` de `usuario_id` em cada tabela são independentes e não impedem que o mesmo usuário esteja nas duas.
 - `usuario.status` pode registrar a inativação lógica (`FALSE`), mas o SQL não bloqueia login ou acesso nem implementa a política de preservação histórica. O backend deve bloquear acesso, preservar os registros e não realizar exclusões físicas no fluxo normal.
 - A chave estrangeira `interesse.veiculo_id` garante que o veículo exista, mas o SQL não garante que ele pertença ao motorista indicado no mesmo interesse. Essa consistência deve ser verificada no backend.
+- O SQL não garante que `veiculo.ativo` ou `veiculo.disponivel` sejam verdadeiros quando o veículo é incluído em busca ou em novo interesse; essas regras devem ser aplicadas no backend.
+- `data_limite_resposta` é obrigatória, mas o SQL não calcula o prazo de 24 horas nem altera automaticamente o status para `EXPIRADO`. O backend deve definir o prazo e aplicar a expiração.
 - O SQL não declara restrições para valores de `ano`, nem outras validações de domínio para os campos textuais ou numéricos além dos tipos e tamanhos definidos.
 - As tabelas `qualificacao`, `veiculo` e `interesse` não declaram unicidade para a combinação de seus campos. Portanto, não há no SQL uma restrição que impeça registros repetidos nessas tabelas.
-- `usuario.status`, `motorista.disponivel` e `veiculo.disponivel` são campos booleanos com os valores padrão indicados. Somente `usuario.status` será usado para inativação lógica da conta; o bloqueio de acesso, a invalidação de sessões e a preservação histórica dependem do backend. `motorista` e `veiculo` não possuem campos de status ou inativação individual.
+- `usuario.status`, `motorista.disponivel`, `veiculo.disponivel` e `veiculo.ativo` são campos booleanos com os valores padrão indicados. Somente `usuario.status` será usado para inativação lógica da conta; `veiculo.ativo` permite desativar veículos sem excluir registros. O bloqueio de acesso, a invalidação de sessões e a preservação histórica dependem do backend. `motorista` não possui campo de status ou inativação individual.
 - O SQL não especifica ações `ON DELETE` ou `ON UPDATE` nas chaves estrangeiras. Também não especifica mecanismo de armazenamento, charset ou collation.
 - Embora `usuario.senha` seja obrigatória, o SQL não define hash, política de senha ou processo de autenticação. Esses comportamentos pertencem à aplicação/backend.
 - O SQL não contém uma tabela separada para administradores; o perfil `ADMIN` está representado em `usuario.tipo_usuario`.

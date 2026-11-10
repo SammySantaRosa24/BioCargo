@@ -54,6 +54,7 @@ CREATE TABLE veiculo (
     modelo VARCHAR(100) NOT NULL,
     ano INT NOT NULL,
     disponivel BOOLEAN NOT NULL DEFAULT FALSE,
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT fk_veiculo_motorista
         FOREIGN KEY (motorista_id)
         REFERENCES motorista(id)
@@ -64,8 +65,12 @@ CREATE TABLE interesse (
     empresa_id INT NOT NULL,
     motorista_id INT NOT NULL,
     veiculo_id INT NULL,
-    status ENUM('PENDENTE', 'ACEITO', 'RECUSADO') NOT NULL DEFAULT 'PENDENTE',
+    status ENUM('PENDENTE', 'ACEITO', 'RECUSADO', 'EXPIRADO', 'CANCELADO') NOT NULL DEFAULT 'PENDENTE',
     data_criacao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    data_limite_resposta DATETIME NOT NULL,
+    cancelado_por ENUM('EMPRESA', 'MOTORISTA') NULL,
+    observacao_cancelamento TEXT NULL,
+    data_cancelamento DATETIME NULL,
     CONSTRAINT fk_interesse_empresa
         FOREIGN KEY (empresa_id)
         REFERENCES empresa(id),

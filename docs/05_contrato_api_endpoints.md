@@ -1,10 +1,10 @@
-# Contrato planejado da API REST — BioCargo
+# Contrato da API REST — BioCargo
 
-> **Status:** proposta de contrato para orientar a implementação. Os endpoints deste documento não estão implementados. A API deverá atender ao frontend React existente e ao esquema MySQL registrado em `database/01_schema.sql`.
+> **Status:** este documento separa os endpoints atualmente implementados das propostas ainda não implementadas. A existência de uma especificação abaixo não significa que o endpoint ou a funcionalidade estejam disponíveis.
 
 ## 1. Objetivo e convenções
 
-Este documento define uma proposta de endpoints, permissões, formatos de dados e erros para o MVP BioCargo. O frontend já contém páginas de login e cadastro, mas ainda não possui serviços HTTP nem integração com o backend.
+Este documento registra o comportamento observado nos endpoints existentes e preserva as propostas para as demais operações do MVP. O frontend já integra cadastro e login; as outras operações listadas como planejadas continuam sem implementação.
 
 ### URLs e JSON
 
@@ -45,21 +45,28 @@ Os valores de paginação são uma proposta inicial e precisam ser confirmados a
 
 O cadastro público só cria usuários `EMPRESA` ou `MOTORISTA`. Não há endpoint de cadastro público como `ADMIN`. O perfil é determinado pela rota e validado no servidor.
 
-### Endpoints planejados
+### Endpoints implementados
 
 | Método e caminho | Finalidade | Perfil autorizado | Entrada | Sucesso | Erros possíveis |
 |---|---|---|---|---|---|
-| `POST /api/v1/auth/register/company` | Cadastrar usuário e perfil de empresa. | Visitante | JSON de cadastro de empresa abaixo. | `201 Created`, usuário e empresa criados. | `400`, `409`, `422`, `500` |
-| `POST /api/v1/auth/register/driver` | Cadastrar usuário e perfil de motorista PJ. | Visitante | JSON de cadastro de motorista abaixo. | `201 Created`, usuário e motorista criados. | `400`, `409`, `422`, `500` |
-| `POST /api/v1/auth/login` | Autenticar com e-mail e senha. | Visitante | `email`, `senha`. | `200 OK`, identidade autenticada e credencial/sessão conforme estratégia ainda pendente. | `400`, `401`, `422`, `500` |
-| `GET /api/v1/auth/me` | Consultar usuário autenticado. | `EMPRESA`, `MOTORISTA` ou `ADMIN` autenticado | Sem parâmetros. | `200 OK`, dados básicos do usuário. | `401`, `500` |
-| `POST /api/v1/auth/logout` | Encerrar sessão quando o mecanismo adotado permitir revogação no servidor. | Usuário autenticado | Sem corpo. | `204 No Content`, se aplicável à estratégia definida. | `401`, `500` |
+| `POST /api/v1/auth/register/company` | Cadastrar usuário e perfil de empresa em transação. | Visitante | `razaoSocial`, `cnpj`, `email`, `senha`; `nomeFantasia` e `telefone` opcionais. | `201 Created`, IDs do usuário e da empresa. | `400` para campos obrigatórios ausentes; `409` para duplicidade; `500` para erro inesperado. |
+| `POST /api/v1/auth/register/driver` | Cadastrar usuário e perfil de motorista PJ em transação. | Visitante | `nomeCompleto`, `cpf`, `cnpj`, `email`, `senha`; `telefone` opcional. | `201 Created`, IDs do usuário e do motorista. | `400` para campos obrigatórios ausentes; `409` para duplicidade; `500` para erro inesperado. |
+| `POST /api/v1/auth/login` | Verificar credenciais e iniciar sessão persistida no MySQL. | Visitante | `email`, `senha`. | `200 OK`, identidade em `data.usuario`; o cookie de sessão é enviado pelo servidor. | `400` para campos ausentes; `401` para e-mail/senha inválidos; `403` para conta inativa; `500` para erro inesperado. |
+| `GET /api/v1/auth/me` | Consultar a identidade armazenada na sessão atual. | Com sessão válida | Sem parâmetros. | `200 OK`, `data.usuario` com `id`, `email` e `tipoUsuario`. | `401` sem identidade de sessão. |
+| `POST /api/v1/auth/logout` | Destruir a sessão atual e limpar o cookie `biocargo.sid`. | Sem verificação de autenticação na rota | Sem corpo. | `200 OK` com mensagem de sucesso. | `500` se houver falha ao destruir a sessão. **Implementado; teste ainda pendente.** |
+| `GET /api/v1/health` | Verificar a API e a conexão com o MySQL (`SELECT 1`). | Público | Sem parâmetros. | `200 OK` com `status: "OK"` e banco conectado. | `500` com API em execução e banco indisponível. |
 
-Logout é condicional: se a estratégia for stateless e não houver revogação no servidor, o cliente poderá descartar sua credencial; a necessidade e semântica de um endpoint de logout ficam pendentes.
+Cadastro e login foram integrados ao frontend e testados, assim como a persistência da sessão. O teste de logout permanece pendente. O login normaliza e-mail com espaços externos removidos e letras minúsculas. Senhas são armazenadas como derivação `scrypt` com salt aleatório; não são retornadas na resposta. A sessão usa `express-session` e `express-mysql-session`, cookie `biocargo.sid`, `httpOnly`, `sameSite: 'lax'`, `secure: false` e duração configurada de 24 horas.
+
+As respostas e status acima refletem o código atual, não uma promessa de cobertura completa de validação. O servidor valida a presença/tipo de alguns campos obrigatórios, mas não implementa todas as validações de domínio ou formatos propostas neste documento.
+
+### Endpoints planejados, ainda não implementados
+
+As propostas para perfis, busca, veículos, qualificações, interesses e administração nas seções seguintes são referência de escopo e contrato futuro. Não existem atualmente rotas backend para essas operações.
 
 ### Cadastro de empresa
 
-O formulário existente contém `razaoSocial`, `nomeFantasia`, `cnpj`, `telefone`, `email`, `password` e `confirmPassword`. Para a API, a proposta é usar `senha`; confirmação de senha é validada pelo frontend e não precisa ser persistida nem enviada. Os campos opcionais refletem os campos anuláveis no SQL.
+O formulário existente contém `razaoSocial`, `nomeFantasia`, `cnpj`, `telefone`, `email`, `password` e `confirmPassword`. O frontend envia `senha`; a confirmação é validada localmente e não é enviada. `nomeFantasia` e `telefone` são opcionais para o servidor.
 
 ```json
 {
@@ -72,7 +79,7 @@ O formulário existente contém `razaoSocial`, `nomeFantasia`, `cnpj`, `telefone
 }
 ```
 
-Resposta `201` proposta:
+Resposta `201` atual:
 
 ```json
 {
@@ -85,11 +92,11 @@ Resposta `201` proposta:
 
 ### Cadastro de motorista PJ
 
-O frontend chama o campo de nome `nomeCompleto`; o banco usa `motorista.nome`. A integração deverá mapear esse campo para `nome`. A API propõe `senha` e não recebe `confirmPassword`.
+O formulário e o servidor usam `nomeCompleto`; o backend grava esse valor em `motorista.nome`. A API recebe `senha` e não recebe `confirmPassword`.
 
 ```json
 {
-  "nome": "<nome completo>",
+  "nomeCompleto": "<nome completo>",
   "cpf": "<cpf>",
   "cnpj": "<cnpj>",
   "telefone": "<telefone opcional>",
@@ -98,7 +105,7 @@ O frontend chama o campo de nome `nomeCompleto`; o banco usa `motorista.nome`. A
 }
 ```
 
-Resposta `201` proposta:
+Resposta `201` atual:
 
 ```json
 {
@@ -120,26 +127,22 @@ Entrada do login, compatível com os campos atuais da página:
 }
 ```
 
-Exemplo parcial de `200` — mecanismo e campo de sessão ainda pendentes:
+Resposta `200` atual (a sessão é transportada pelo cookie HTTP, sem campo `sessao` no JSON):
 
 ```json
 {
   "data": {
-    "usuario": { "id": 101, "email": "<email>", "tipoUsuario": "EMPRESA" },
-    "sessao": "<formato a definir>"
+    "usuario": { "id": 101, "email": "<email>", "tipoUsuario": "EMPRESA" }
   }
 }
 ```
 
-`GET /auth/me` retorna identidade mínima, sem senha:
+`GET /api/v1/auth/me` retorna a identidade guardada na sessão, sem senha:
 
 ```json
 {
   "data": {
-    "id": 101,
-    "email": "<email>",
-    "tipoUsuario": "EMPRESA",
-    "status": true
+    "usuario": { "id": 101, "email": "<email>", "tipoUsuario": "EMPRESA" }
   }
 }
 ```
@@ -243,7 +246,7 @@ Exemplo de resposta:
 }
 ```
 
-Não há endpoint de exclusão física de veículo neste contrato. A necessidade de inativação individual do veículo ainda será avaliada; o esquema atual não possui campo para isso, e a decisão deve preservar interesses e histórico relacionados sem inventar um campo de status.
+Não há endpoint de exclusão física de veículo neste contrato. O campo `ativo` permite desativá-lo sem excluir o registro; veículos inativos não aparecem em buscas de disponibilidade e não podem ser selecionados em novos interesses. Interesses e histórico relacionados são preservados.
 
 ## 6. Qualificações
 
@@ -284,7 +287,7 @@ Não se propõe `DELETE`: a tabela `qualificacao` não possui campo de inativaç
 
 | Parâmetro | Obrigatório | Base no esquema | Descrição |
 |---|---|---|---|
-| `veiculoDisponivel` | NÃO | `veiculo.disponivel` | Restringir os veículos associados por disponibilidade; não altera o requisito padrão de motorista disponível. |
+| `veiculoDisponivel` | NÃO | `veiculo.disponivel` | Restringir os veículos ativos associados por disponibilidade; não altera o requisito padrão de motorista disponível. |
 | `marca` | NÃO | `veiculo.marca` | Filtrar pela marca cadastrada do veículo. |
 | `modelo` | NÃO | `veiculo.modelo` | Filtrar pelo modelo cadastrado. |
 | `ano` | NÃO | `veiculo.ano` | Filtrar pelo ano cadastrado. |
@@ -293,9 +296,9 @@ Não se propõe `DELETE`: a tabela `qualificacao` não possui campo de inativaç
 
 Por padrão, a busca inclui somente motoristas cuja conta relacionada esteja ativa (`usuario.status = TRUE`) e cujo perfil esteja disponível (`motorista.disponivel = TRUE`). Nenhum filtro pode incluir contas inativas ou motoristas indisponíveis. Filtros adicionais apenas restringem esse conjunto padrão.
 
-Os três campos têm significados diferentes: `usuario.status` indica se a conta está ativa e pode acessar o sistema; `motorista.disponivel` indica se o motorista aceita ser encontrado para novas oportunidades e aparece como `motoristaDisponivel` no resultado de busca; `veiculo.disponivel` indica a disponibilidade de cada veículo e aparece junto ao veículo. A disponibilidade do veículo não substitui as duas verificações do motorista. O status da conta não é exposto na resposta.
+Os quatro campos têm significados diferentes: `usuario.status` indica se a conta está ativa e pode acessar o sistema; `motorista.disponivel` indica se o motorista aceita ser encontrado para novas oportunidades e aparece como `motoristaDisponivel` no resultado de busca; `veiculo.disponivel` indica a disponibilidade operacional de cada veículo e aparece junto ao veículo; `veiculo.ativo` indica se o veículo pode aparecer na busca ou ser selecionado em novos interesses. A disponibilidade do veículo não substitui as verificações de conta e motorista. O status da conta não é exposto na resposta.
 
-Filtros de veículo devem ser aplicados mantendo a associação com o motorista. A busca não deve aceitar CPF, CNPJ ou e-mail como filtros. A combinação dos filtros e a paginação ainda precisam de validação de produto.
+Somente veículos `ativo = TRUE` podem aparecer nos resultados. Filtros de veículo devem ser aplicados mantendo a associação com o motorista. A busca não deve aceitar CPF, CNPJ ou e-mail como filtros. A combinação dos filtros e a paginação ainda precisam de validação de produto.
 
 ### Dados retornados
 
@@ -327,7 +330,7 @@ O exemplo não inclui CPF, CNPJ, e-mail, telefone, placa ou RENAVAM. A exposiç�
 
 ## 8. Interesses
 
-Somente a empresa autenticada poderá criar um interesse em seu próprio nome. A API deriva `empresaId` exclusivamente da sessão; o cliente não envia `empresaId` nem `status` na criação. `motoristaId` identifica o motorista-alvo e `veiculoId` é opcional. Quando informado, o backend valida que o veículo existe, está disponível (`veiculo.disponivel = TRUE`) e pertence ao motorista indicado.
+Somente a empresa autenticada poderá criar um interesse em seu próprio nome. A API deriva `empresaId` exclusivamente da sessão; o cliente não envia `empresaId` nem `status` na criação. `motoristaId` identifica o motorista-alvo e `veiculoId` é opcional. O motorista deve estar disponível. Quando informado, o backend valida que o veículo existe, está ativo (`veiculo.ativo = TRUE`), disponível (`veiculo.disponivel = TRUE`) e pertence ao motorista indicado.
 
 | Método e caminho | Finalidade | Perfil autorizado | Entrada | Sucesso | Erros possíveis |
 |---|---|---|---|---|---|
@@ -337,6 +340,7 @@ Somente a empresa autenticada poderá criar um interesse em seu próprio nome. A
 | `GET /api/v1/interests/:id` | Consultar interesse relacionado ao usuário autenticado. | Empresa criadora ou motorista destinatário | `id` na URL. | `200 OK`, interesse visível ao participante. | `400`, `401`, `403`, `404`, `500` |
 | `POST /api/v1/interests/:id/accept` | Aceitar interesse recebido. | `MOTORISTA` destinatário | `id` na URL; sem corpo. | `200 OK`, interesse atualizado. | `400`, `401`, `403`, `404`, `409`, `500` |
 | `POST /api/v1/interests/:id/reject` | Recusar interesse recebido. | `MOTORISTA` destinatário | `id` na URL; sem corpo. | `200 OK`, interesse atualizado. | `400`, `401`, `403`, `404`, `409`, `500` |
+| `POST /api/v1/interests/:id/cancel` | Cancelar interesse conforme o papel do participante. | Empresa criadora ou motorista destinatário | Empresa: sem justificativa. Motorista: `observacaoCancelamento` obrigatória. | `200 OK`, status `CANCELADO` e metadados de cancelamento. | `400`, `401`, `403`, `404`, `409`, `422`, `500` |
 
 Exemplo de criação:
 
@@ -357,12 +361,13 @@ Exemplo de criação:
     "motoristaId": 202,
     "veiculoId": 301,
     "status": "PENDENTE",
-    "dataCriacao": "<data ISO 8601>"
+    "dataCriacao": "<data ISO 8601>",
+    "dataLimiteResposta": "<data ISO 8601>"
   }
 }
 ```
 
-Resposta `200` de aceite ou recusa tem o mesmo recurso, com `status` atualizado. O motorista relacionado é o destinatário das ações. As transições permitidas, a possibilidade de resposta apenas enquanto `PENDENTE` e a política de interesses duplicados ainda precisam de decisão.
+O prazo `dataLimiteResposta` é 24 horas após `dataCriacao`. Sem resposta, o interesse expira automaticamente (`EXPIRADO`). O motorista destinatário pode aceitar ou recusar somente enquanto `PENDENTE`. A empresa pode cancelar somente enquanto `PENDENTE`, sem justificativa obrigatória; o motorista pode cancelar somente após aceite e deve enviar justificativa. Cancelamentos registram `canceladoPor`, `dataCancelamento` e, no cancelamento pelo motorista, `observacaoCancelamento`. Interesses recusados, expirados ou cancelados permanecem no histórico. Após esses estados, uma nova solicitação pode ser criada se o motorista estiver disponível. A política de duplicidade fora desses estados ainda precisa de decisão.
 
 ## 9. Administração
 
@@ -391,11 +396,11 @@ Convenções adicionais propostas:
 
 ### Exemplos ilustrativos de resposta por endpoint
 
-Os exemplos seguintes completam as formas de resposta não mostradas junto às operações. São ilustrativos do contrato planejado, não respostas de uma API implementada. IDs e valores entre sinais angulares são placeholders. Endpoints com `204` não têm corpo JSON.
+Os exemplos seguintes completam formas de resposta propostas para operações ainda não implementadas. IDs e valores entre sinais angulares são placeholders. A linha de logout abaixo registra a resposta atualmente implementada.
 
 | Endpoint | Exemplo ilustrativo de sucesso |
 |---|---|
-| `POST /api/v1/auth/logout` | `204 No Content` — sem corpo. |
+| `POST /api/v1/auth/logout` | Implementado: `200 OK`, `{ "message": "Logout realizado com sucesso." }`; teste pendente. |
 | `PATCH /api/v1/companies/me` | `200`: `{ "data": { "id": 201, "razaoSocial": "<razao social>", "nomeFantasia": null, "cnpj": "<cnpj>", "telefone": "<telefone>" } }` |
 | `PATCH /api/v1/drivers/me` | `200`: `{ "data": { "id": 202, "nome": "<nome>", "cpf": "<cpf>", "cnpj": "<cnpj>", "telefone": null, "disponivel": true } }` |
 | `GET /api/v1/drivers/me/vehicles` | `200`: `{ "data": [{ "id": 301, "placa": "<placa>", "renavam": "<renavam>", "marca": "<marca>", "modelo": "<modelo>", "ano": 2024, "disponivel": false }] }` |
@@ -413,10 +418,10 @@ Os exemplos seguintes completam as formas de resposta não mostradas junto às o
 
 ## 11. Segurança e autorização
 
-- Rotas protegidas exigem autenticação válida; a estratégia e o transporte da credencial ainda estão pendentes.
+- Para as rotas futuras, exigir autenticação válida. O login atual usa sessão HTTP com cookie `biocargo.sid` persistido no MySQL; a implementação de middleware de autorização para novos módulos continua pendente.
 - A API autoriza por tipo de usuário e por propriedade do registro. Uma FK válida não concede acesso ao registro.
-- Contas com `usuario.status = FALSE` não podem iniciar sessão nem continuar acessando rotas protegidas. A inativação administrativa deve invalidar as sessões ativas; o mecanismo técnico depende da estratégia de sessão escolhida.
-- O backend valida formato, campos permitidos, tamanho e regras de negócio em todas as entradas. A validação local existente é apenas apoio de interface.
+- O login atual recusa contas com `usuario.status = FALSE` (resposta `403`). A proteção de rotas futuras e a invalidação de sessões por inativação administrativa ainda não estão implementadas.
+- Os endpoints atuais verificam presença e alguns tipos de campos obrigatórios, mas não cobrem todas as validações de formato/domínio descritas para o MVP. Os novos endpoints devem validar no servidor; a validação local do frontend é apenas apoio de interface.
 - A regra aprovada de CNPJ global atravessa duas tabelas e não é assegurada pelos `UNIQUE` atuais. A verificação deve tratar concorrência; a estratégia técnica compatível com o esquema atual está pendente.
 - A regra de um único perfil entre `EMPRESA` e `MOTORISTA` não é imposta pelo SQL. O backend deve validá-la também em operações concorrentes; estratégia pendente.
 - CPF, CNPJ, e-mail, senha, telefone, placa e RENAVAM não devem ser expostos nos resultados da busca disponibilizada exclusivamente a empresas autenticadas. Respostas de perfil próprio podem conter dados necessários ao titular, conforme contrato de cada recurso.
@@ -434,7 +439,7 @@ Os exemplos seguintes completam as formas de resposta não mostradas junto às o
 |---|---|
 | `200 OK` | Consulta ou atualização concluída com conteúdo. |
 | `201 Created` | Recurso criado. |
-| `204 No Content` | Operação concluída sem corpo, como logout se suportado pela estratégia escolhida. |
+| `204 No Content` | Operação concluída sem corpo; não é o status usado pelo logout atual, que responde `200` com mensagem. |
 | `400 Bad Request` | JSON malformado, parâmetros inválidos ou campos obrigatórios ausentes. |
 | `401 Unauthorized` | Credencial ausente, inválida, expirada ou login recusado. Para evitar enumeração, credenciais inválidas e usuário inativo podem receber mensagem genérica. |
 | `403 Forbidden` | Usuário autenticado sem perfil ou propriedade autorizada para a operação. |
@@ -471,7 +476,7 @@ Formato padronizado proposto:
 }
 ```
 
-Os códigos de erro e mensagens apresentados são propostas para uniformização e devem ser confirmados durante a implementação.
+Os códigos de erro e mensagens desta seção são propostas para os endpoints futuros. Nos handlers existentes, cadastro/login usam objeto `{ "message": "..." }` em erros; status e mensagens atuais constam na tabela da seção 2.
 
 ## 13. Matriz de permissões
 
@@ -496,8 +501,8 @@ Legenda: **Próprio** = somente o perfil ligado à conta autenticada; **Busca** 
 
 Samy e Rafael precisam alinhar antes de considerar o contrato fechado:
 
-- Estratégia de autenticação e sessão: token/cookie, armazenamento, expiração, renovação e logout. Invalidar sessões ativas após inativação é requisito; falta definir o mecanismo técnico.
-- Biblioteca de acesso ao MySQL e mecanismo de transações.
+- Política de sessão em produção, incluindo expiração/renovação além da duração atual de 24 horas e invalidação de sessões após inativação administrativa. O logout está implementado e seu teste está pendente.
+- A biblioteca de acesso atual é `mysql2/promise`; os cadastros integrados usam transações. Estratégia transacional para os novos módulos deve ser definida conforme necessário.
 - Contrato exato de payload, resposta, erros, versionamento e paginação. A API deve usar ISO 8601 UTC; falta configurar a conexão MySQL em UTC ou as conversões para o `DATETIME` sem fuso.
 - Verificar a collation real e os e-mails já armazenados no MySQL para alinhar a restrição `UNIQUE` com a forma canônica normalizada pela API, sem alterar o esquema nesta etapa.
 - Campos de perfil que podem ser alterados, inclusive possibilidade de alteração de e-mail e documentos.
@@ -510,13 +515,16 @@ Samy e Rafael precisam alinhar antes de considerar o contrato fechado:
 - Processo de criação inicial de `ADMIN` e regras operacionais da inativação, incluindo auto-inativação e proteção do último administrador.
 - Se empresas poderão consultar diretamente um veículo por ID ou apenas os dados retornados na busca.
 
-## Endpoints propostos — resumo
+## Endpoints deste documento — resumo de status
+
+Os cinco endpoints de autenticação e o health check abaixo estão implementados conforme a seção 2. Os demais são propostas futuras.
 
 - `POST /api/v1/auth/register/company`
 - `POST /api/v1/auth/register/driver`
 - `POST /api/v1/auth/login`
 - `GET /api/v1/auth/me`
-- `POST /api/v1/auth/logout` (condicional à estratégia de sessão)
+- `POST /api/v1/auth/logout` (implementado; teste pendente)
+- `GET /api/v1/health` (implementado)
 - `GET /api/v1/companies/me`
 - `PATCH /api/v1/companies/me`
 - `GET /api/v1/drivers/me`
@@ -536,17 +544,18 @@ Samy e Rafael precisam alinhar antes de considerar o contrato fechado:
 - `GET /api/v1/interests/:id`
 - `POST /api/v1/interests/:id/accept`
 - `POST /api/v1/interests/:id/reject`
+- `POST /api/v1/interests/:id/cancel` (planejado; ainda não implementado)
 - `PATCH /api/v1/admin/users/:id/status` (inativação lógica; planejado, ainda não implementado)
 
 Não foram propostos endpoints de exclusão física.
 
 ## Resumo das decisões documentadas
 
-- O contrato é planejado para REST/JSON, React, Node.js/Express e MySQL 8; ainda não descreve implementação existente.
+- A API REST/JSON usa prefixo `/api/v1`, Node.js/Express e MySQL 8. Cadastro, login, sessão, consulta de sessão e health check estão implementados; as operações restantes deste contrato são propostas.
 - Cadastro público é restrito a empresa e motorista. `ADMIN` não pode ser criado por essas rotas.
 - A API deve garantir autorização por perfil e propriedade, CNPJ global, perfil exclusivo, associação correta entre veículo e interesse, bloqueio de inativos e preservação histórica.
 - A busca retorna por padrão somente contas ativas e motoristas disponíveis; distingue status da conta, disponibilidade do motorista e do veículo. Não expõe documentos, contatos, placa ou RENAVAM; a divulgação do nome ainda depende de aprovação.
 - A inativação deve ser administrativa e lógica, bloquear o acesso e invalidar sessões ativas, preservando registros e histórico. O endpoint proposto ainda não foi implementado.
 - Não há exclusão de qualificação/veículo proposta enquanto política de preservação e suporte de inativação não estiverem definidos.
 
-Este documento é uma especificação planejada; nenhum endpoint nele descrito está implementado.
+Este documento descreve parcialmente endpoints implementados e parcialmente propostas futuras; consulte a seção 2 para a lista e os status atuais.

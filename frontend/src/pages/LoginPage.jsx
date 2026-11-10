@@ -2,14 +2,42 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import AuthLayout from '../components/auth/AuthLayout.jsx'
 import FormField from '../components/auth/FormField.jsx'
-import PendingIntegrationMessage from '../components/auth/PendingIntegrationMessage.jsx'
+import { loginUser } from '../services/api.js'
 
 function LoginPage() {
-  const [showPendingMessage, setShowPendingMessage] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [feedback, setFeedback] = useState(null)
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
-    setShowPendingMessage(true)
+
+    const form = event.currentTarget
+    const formData = new FormData(form)
+
+    const email = formData.get('email')
+    const senha = formData.get('password')
+
+    setIsSubmitting(true)
+    setFeedback(null)
+
+    try {
+      await loginUser({
+        email: email.trim().toLowerCase(),
+        senha,
+      })
+
+      setFeedback({
+        type: 'success',
+        message: 'Login realizado com sucesso!',
+      })
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error.message,
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -27,6 +55,7 @@ function LoginPage() {
           autoComplete="email"
           placeholder="voce@empresa.com.br"
         />
+
         <FormField
           id="password"
           label="Senha"
@@ -35,10 +64,29 @@ function LoginPage() {
           autoComplete="current-password"
           placeholder="Digite sua senha"
         />
-        <button className="auth-submit" type="submit">Entrar <span aria-hidden="true">↗</span></button>
-        {showPendingMessage && <PendingIntegrationMessage />}
+
+        <button
+          className="auth-submit"
+          type="submit"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Entrando...' : 'Entrar'}
+          {!isSubmitting && <span aria-hidden="true">↗</span>}
+        </button>
+
+        {feedback && (
+          <p
+            role={feedback.type === 'error' ? 'alert' : 'status'}
+            className={feedback.type === 'error' ? 'auth-field__error' : ''}
+          >
+            {feedback.message}
+          </p>
+        )}
       </form>
-      <p className="auth-switch">Ainda não tem uma conta? <Link to="/cadastro">Cadastre-se</Link></p>
+
+      <p className="auth-switch">
+        Ainda não tem uma conta? <Link to="/cadastro">Cadastre-se</Link>
+      </p>
     </AuthLayout>
   )
 }

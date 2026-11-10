@@ -85,6 +85,9 @@ As regras a seguir são requisitos funcionais aprovados. Algumas estão parcialm
 - Um interesse relaciona uma empresa a um motorista e pode indicar um veículo.
 - O veículo indicado em um interesse deve pertencer ao motorista relacionado.
 - Ao criar interesse com veículo, o veículo deve existir e estar disponível, além de pertencer ao motorista relacionado.
+- Veículos com `ativo = FALSE` não aparecem em buscas de disponibilidade e não podem ser selecionados em novos interesses; seus registros são preservados.
+- A empresa cancela somente interesses `PENDENTE`, sem justificativa obrigatória; o motorista cancela somente interesses `ACEITO`, com justificativa obrigatória.
+- O interesse expira automaticamente 24 horas após a criação sem resposta. Interesses `RECUSADO`, `EXPIRADO` ou `CANCELADO` permanecem no histórico; uma nova solicitação pode ser criada após esses estados se o motorista estiver disponível.
 - A inativação de usuário será lógica, bloqueará o acesso e preservará registros e histórico.
 - O fluxo normal da aplicação não deverá realizar exclusões físicas de usuários ou de registros históricos.
 
@@ -107,8 +110,8 @@ Esta seção lista as garantias efetivamente declaradas em `01_schema.sql`:
   - `motorista.usuario_id`, `motorista.cpf` e `motorista.cnpj`;
   - `veiculo.placa` e `veiculo.renavam`.
 - **Obrigatoriedade nas relações:** `empresa.usuario_id`, `motorista.usuario_id`, `qualificacao.motorista_id`, `veiculo.motorista_id`, `interesse.empresa_id` e `interesse.motorista_id` são `NOT NULL`. `interesse.veiculo_id` aceita `NULL`.
-- **Valores enumerados:** `usuario.tipo_usuario` aceita `EMPRESA`, `MOTORISTA` e `ADMIN`; `interesse.status` aceita `PENDENTE`, `ACEITO` e `RECUSADO`.
-- **Defaults relevantes:** `usuario.status` inicia com `TRUE`; `motorista.disponivel` e `veiculo.disponivel` iniciam com `FALSE`; `interesse.status` inicia com `PENDENTE`.
+- **Valores enumerados:** `usuario.tipo_usuario` aceita `EMPRESA`, `MOTORISTA` e `ADMIN`; `interesse.status` aceita `PENDENTE`, `ACEITO`, `RECUSADO`, `EXPIRADO` e `CANCELADO`.
+- **Defaults relevantes:** `usuario.status` inicia com `TRUE`; `motorista.disponivel` e `veiculo.disponivel` iniciam com `FALSE`; `veiculo.ativo` inicia com `TRUE`; `interesse.status` inicia com `PENDENTE`.
 
 As FKs garantem que a referência apontada exista. As restrições `UNIQUE` se aplicam às colunas indicadas dentro de suas respectivas tabelas. O SQL não declara `ON DELETE CASCADE`.
 
@@ -119,7 +122,8 @@ O SQL atual não garante os requisitos a seguir; a API deverá validá-los e apl
 - **Unicidade global do CNPJ:** `empresa.cnpj` e `motorista.cnpj` têm restrições `UNIQUE` separadas. Não há restrição cruzada entre as duas tabelas.
 - **Exclusividade de perfil:** os `UNIQUE` independentes em `empresa.usuario_id` e `motorista.usuario_id` não impedem o mesmo usuário de aparecer nas duas tabelas.
 - **Correspondência entre tipo e perfil:** as FKs não garantem `usuario.tipo_usuario = 'EMPRESA'` para uma empresa nem `usuario.tipo_usuario = 'MOTORISTA'` para um motorista. Também cabe ao backend impedir associação indevida de registros de perfil a usuários `ADMIN`.
-- **Veículo associado ao interesse:** a FK confirma que o veículo existe, mas o SQL não valida que esteja disponível nem compara `veiculo.motorista_id` com `interesse.motorista_id`. O backend deve conferir existência, `veiculo.disponivel = TRUE` e propriedade em relação a `interesse.motorista_id` antes de criar o interesse.
+- **Veículo associado ao interesse:** a FK confirma que o veículo existe, mas o SQL não valida que esteja ativo/disponível nem compara `veiculo.motorista_id` com `interesse.motorista_id`. O backend deve conferir existência, `veiculo.ativo = TRUE`, `veiculo.disponivel = TRUE` e propriedade em relação a `interesse.motorista_id` antes de criar o interesse.
+- **Prazo e transições de interesse:** o SQL limita os valores de `status` e armazena os campos de prazo/cancelamento, mas não calcula o limite de 24 horas, expira registros automaticamente nem valida ator, estado e justificativa de cancelamento. Essas regras dependem do backend.
 - **Bloqueio de usuários inativos:** `usuario.status` armazena um valor booleano, mas o SQL não impede autenticação de usuários com status `FALSE`.
 - **Preservação do histórico:** o SQL não estabelece uma política de exclusão lógica para todas as entidades nem impede que a aplicação tente excluir registros fisicamente. O fluxo da API deve inativar usuários, bloquear seu acesso e evitar exclusões físicas de usuários e dados históricos.
 
