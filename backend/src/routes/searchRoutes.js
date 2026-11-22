@@ -6,7 +6,7 @@ const ALLOWED_QUERY_FIELDS = new Set([
 ]);
 
 function escapeLike(value) {
-  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
+  return value.replace(/[!%_]/g, (character) => `!${character}`);
 }
 
 function parseSearchQuery(query) {
@@ -29,7 +29,7 @@ function parseSearchQuery(query) {
       if (query[field].trim().length > 100) {
         return { error: `${field} excede o comprimento permitido.`, status: 422 };
       }
-      parsed.vehicleConditions.push(`${field} LIKE ? ESCAPE '\\'`);
+      parsed.vehicleConditions.push(`${field} LIKE ? ESCAPE '!'`);
       parsed.vehicleValues.push(`%${escapeLike(query[field].trim())}%`);
     }
   }
@@ -78,7 +78,7 @@ function buildDriverConditions(parsed) {
   }
   if (parsed.qualificationValue !== undefined) {
     conditions.push(`EXISTS (
-      SELECT 1 FROM qualificacao qf WHERE qf.motorista_id = m.id AND qf.titulo LIKE ? ESCAPE '\\'
+      SELECT 1 FROM qualificacao qf WHERE qf.motorista_id = m.id AND qf.titulo LIKE ? ESCAPE '!'
     )`);
     values.push(parsed.qualificationValue);
   }
