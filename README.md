@@ -49,6 +49,7 @@ DB_PASSWORD=sua_senha_mysql
 DB_NAME=biocargo
 PORT=3000
 SESSION_SECRET=seu_segredo_local_longo_e_aleatorio
+CORS_ORIGINS=
 ```
 
 Use um segredo próprio e aleatório para `SESSION_SECRET`; não reutilize o valor de exemplo nem compartilhe o arquivo `.env`. O arquivo está ignorado pelo Git.
@@ -81,6 +82,6 @@ npm run build
 
 ## Estado atual
 
-Estão implementados no backend cadastro de empresa e motorista PJ, login com sessão persistida no MySQL, consulta da sessão atual, logout e verificação de saúde da API/conexão com banco. O logout ainda precisa de teste. Perfis, veículos, qualificações, busca, interesses e operações administrativas continuam planejados e não devem ser considerados disponíveis por constarem na documentação.
+Estão implementados no backend cadastro de empresa e motorista PJ, login com sessão persistida no MySQL, consulta da sessão atual, logout, verificação de saúde da API/conexão com banco, consulta/atualização dos próprios perfis, gestão de veículos e qualificações, disponibilidade, busca, interesses e inativação administrativa. Rotas protegidas exigem sessão ativa e o tipo de conta correspondente. O teste específico do logout ainda está pendente. Para origens diferentes no mesmo site, configure `CORS_ORIGINS` com origens exatas separadas por vírgula; sem configuração, use same-origin/Vite proxy. Uma implantação cross-site precisa de política adicional de cookie e CSRF.
 
 O contrato de endpoints e seus status está em [`docs/05_contrato_api_endpoints.md`](docs/05_contrato_api_endpoints.md). O estado e as instruções de transferência do backend estão em [`docs/06_handoff_backend_rafael.md`](docs/06_handoff_backend_rafael.md).

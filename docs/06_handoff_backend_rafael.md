@@ -3,13 +3,13 @@
 **Destinatário:** Rafael Alvarenga  
 **Objetivo:** transferir a Rafael o estado atual do backend, os procedimentos para executá-lo e o trabalho ainda pendente.
 
-Este documento descreve o estado observado no repositório em 09/11/2026. O código é a referência para o que já existe; funcionalidades apenas documentadas como planejadas não devem ser tratadas como implementadas. Regras de negócio aprovadas são separadas das decisões técnicas ainda pendentes.
+Este documento descreve o estado do repositório atualizado em 16/11/2026. O código é a referência para o que já existe; funcionalidades apenas documentadas como planejadas não devem ser tratadas como implementadas. Regras de negócio aprovadas são separadas das decisões técnicas ainda pendentes.
 
 ## 1. Identificação e objetivo do projeto
 
 O BioCargo é uma plataforma web para conectar empresas que precisam de serviços de transporte biológico a motoristas PJ qualificados e com veículos adequados. O backend deverá receber as requisições do frontend, validar dados e permissões, aplicar as regras de negócio e persistir os registros no MySQL 8.
 
-O MVP prevê cadastro e autenticação de empresas e motoristas, perfis, veículos, qualificações, busca de motoristas e veículos e demonstração de interesse. Cadastro, login, sessão, consulta da sessão e health check já têm implementação; perfis, veículos, qualificações, busca e interesses permanecem planejados. O contrato está em [`05_contrato_api_endpoints.md`](./05_contrato_api_endpoints.md).
+O MVP prevê cadastro e autenticação de empresas e motoristas, perfis, veículos, qualificações, busca de motoristas e veículos e demonstração de interesse. Cadastro, login, sessão, consulta da sessão, health check, perfis próprios, veículos, qualificações, disponibilidade, busca, interesses e inativação administrativa estão implementados. O contrato está em [`05_contrato_api_endpoints.md`](./05_contrato_api_endpoints.md).
 
 ## 2. Escopo do MVP
 
@@ -21,15 +21,18 @@ O MVP prevê cadastro e autenticação de empresas e motoristas, perfis, veícul
 - Consulta da identidade da sessão em `GET /api/v1/auth/me`.
 - Endpoint de logout que destrói a sessão e limpa o cookie; **o teste de logout ainda está pendente**.
 - Verificação de API e conexão MySQL em `GET /api/v1/health`.
+- Consulta e atualização do próprio perfil em `GET/PATCH /api/v1/companies/me` e `GET/PATCH /api/v1/drivers/me`, com autorização por sessão ativa e tipo de conta.
+- Cadastro, listagem, consulta individual, edição e disponibilidade de veículos do motorista autenticado; consultas e atualizações verificam propriedade.
+- Cadastro, listagem e atualização de qualificações do motorista proprietário.
+- Busca de motoristas para empresas com filtros de veículos e qualificações; respostas minimizadas e paginadas.
+- Criação e consulta de interesses, respostas, cancelamentos e expiração; estados ativos duplicados são bloqueados.
+- Inativação lógica de usuários por `ADMIN`, com remoção das sessões persistidas.
 - Integração do frontend com cadastro e login; build do frontend executado com sucesso, conforme validação informada pela equipe.
 
-### Planejado para o MVP, ainda não implementado
+### Pendências do MVP
 
-- Consulta e atualização do próprio perfil.
-- Cadastro, consulta e atualização de veículos e qualificações do motorista.
-- Busca autenticada de motoristas e dados de veículos, respeitando as regras de disponibilidade e privacidade.
-- Criação e consulta de interesses; aceite ou recusa pelo motorista destinatário, cancelamento pela empresa enquanto pendente ou pelo motorista após aceite, expiração automática após 24 horas sem resposta e preservação do histórico.
-- Inativação lógica de conta por `ADMIN` autorizado, com bloqueio de acesso, invalidação de sessões ativas e preservação do histórico.
+- Validar as rotas recém-implementadas contra MySQL 8 e concluir o teste específico de logout.
+- Provisionar a primeira conta `ADMIN` por procedimento seguro fora do cadastro público.
 
 ### Fora do escopo aprovado ou sem requisitos suficientes
 
@@ -76,9 +79,9 @@ O README da raiz contém os mesmos passos. `npm start` inicia o backend sem o mo
 | Parte | Tecnologia | Situação/responsabilidade |
 |---|---|---|
 | Frontend | React 19, JavaScript, Vite, React Router DOM, CSS puro | Implementado parcialmente; interface, cadastro e login integrados. |
-| Backend | Node.js, Express, JavaScript | Parcialmente implementado; cadastro, login, sessões e health check. Rafael continuará os endpoints e regras pendentes. |
+| Backend | Node.js, Express, JavaScript | Cadastro, login, sessões, perfis, veículos, qualificações, busca, interesses, administração e health check implementados. |
 | Persistência | MySQL 8 | Banco existente; esquema documentado em `database/01_schema.sql`. |
-| Comunicação | API REST com JSON | `/api/v1`; cadastro e login integrados; demais fluxos planejados. |
+| Comunicação | API REST com JSON | `/api/v1`; cadastro/login integrados e endpoints do MVP implementados. |
 
 A arquitetura é uma aplicação única, sem microserviços. O navegador comunica-se com a API; somente o backend acessa o MySQL. O acesso ao banco usa `mysql2/promise`; sessões usam `express-session` e `express-mysql-session`. Não há biblioteca de validação declarada.
 
@@ -159,33 +162,32 @@ Endpoints implementados atualmente:
 - Cadastro: `POST /api/v1/auth/register/company` e `POST /api/v1/auth/register/driver`.
 - Sessão: `POST /api/v1/auth/login`, `GET /api/v1/auth/me` e `POST /api/v1/auth/logout` (logout ainda sem teste).
 - Saúde: `GET /api/v1/health`.
-
-Grupos ainda planejados, sem rotas implementadas:
-
-- **Perfis:** `/companies/me` e `/drivers/me`.
-- **Busca:** `GET /drivers`, autenticado por empresa.
-- **Veículos e qualificações:** gestão pelo motorista proprietário, sem exclusão física proposta.
-- **Interesses:** empresa cria e consulta os seus e cancela os pendentes; motorista consulta os recebidos, aceita/recusa os pendentes e cancela os aceitos com justificativa. Expiração automática em 24 horas; histórico preservado.
-- **Administração:** `PATCH /admin/users/:id/status` para inativação lógica, planejado e ainda não implementado.
+- Perfis: `GET/PATCH /api/v1/companies/me` e `GET/PATCH /api/v1/drivers/me`.
+- Veículos: `POST/GET /api/v1/drivers/me/vehicles`, `GET/PATCH /api/v1/vehicles/:id` e `PATCH /api/v1/vehicles/:id/availability`.
+- Qualificações: `POST/GET /api/v1/drivers/me/qualifications` e `PATCH /api/v1/qualifications/:id`.
+- Busca: `GET /api/v1/drivers`, somente para empresa; filtra por veículo/qualificação e retorna informações minimizadas. Não há localização no schema.
+- Interesses: `POST /api/v1/interests`, listas por empresa/motorista, consulta individual, aceite, recusa e cancelamento.
+- Administração: `PATCH /api/v1/admin/users/:id/status`; apenas `ADMIN` ativo pode inativar outra conta.
 
 O prefixo proposto é `/api/v1`; corpos e respostas são JSON com nomes de propriedades `camelCase`. Datas da API usam ISO 8601 UTC; o frontend converte para horário local na apresentação.
 
 ## 9. Autenticação, autorização, sessões e segurança
 
-- **Autenticação:** login compartilhado por e-mail e senha; o backend verifica a senha usando mecanismo seguro ainda a escolher e recusa conta inativa.
-- **Autorização:** perfis `EMPRESA`, `MOTORISTA` e `ADMIN`; validar também propriedade do registro. Proteger API no servidor, não somente rotas React.
-- **Sessões:** a sessão persistida em MySQL já existe e o logout está implementado, mas ainda precisa de teste. Invalidar sessões ativas quando ADMIN inativar uma conta continua requisito futuro; renovação, configurações de produção e revogação administrativa ainda não foram implementadas.
+- **Autenticação:** login compartilhado por e-mail e senha; o backend verifica a senha com `scrypt` e recusa conta inativa.
+- **Autorização:** perfis `EMPRESA`, `MOTORISTA` e `ADMIN`; todas as rotas protegidas revalidam sessão, conta e tipo no servidor, e verificam a propriedade quando necessário.
+- **Sessões:** a sessão persistida em MySQL já existe; a rota administrativa remove as sessões da conta inativada. O logout está implementado, mas ainda precisa de teste; renovação de sessão permanece pendente.
 - **Senhas:** login/cadastro atuais usam `scrypt` com salt aleatório e não devolvem a senha/hash. Revisar tratamento de erros/logs ao ampliar os handlers.
 - **E-mail:** normalizar antes de persistir e consultar. Charset/collation atuais e dados de e-mail existentes precisam ser verificados para alinhar `UNIQUE` à comparação sem distinção de caixa.
 - **Dados pessoais:** não expor CPF, CNPJ, e-mail, telefone, senha, placa ou RENAVAM nos resultados de busca. Campos públicos restantes, inclusive exibição de nome, precisam de aprovação.
 - **SQL:** usar consultas parametrizadas. Usar transações quando o fluxo depender de gravações relacionadas.
-- **Erros:** resposta padronizada sem detalhes internos; conflito de unicidade não deve revelar informação além do necessário.
+- **Erros:** handlers retornam mensagens genéricas sem SQL ou stack trace; conflito de unicidade não revela informação além do necessário.
+- **CORS:** same-origin funciona sem configuração; origens diferentes precisam estar explicitamente listadas em `CORS_ORIGINS`.
 
 Para datas, API usa UTC em ISO 8601 (`Z`). O tipo SQL `DATETIME` não registra fuso; a conexão MySQL deve ser configurada em UTC ou o backend deve fazer conversões explícitas, sem mudar o esquema nesta etapa. A apresentação local ocorre no frontend.
 
 ## 10. Erros e validações
 
-Convenção de erros proposta para os endpoints futuros. Os handlers atuais retornam `{ "message": "..." }` e ainda não usam um envelope de erro uniforme:
+Convenção de erros aplicada aos endpoints atuais. Os handlers retornam `{ "message": "..." }` para falhas e não usam um envelope de erro uniforme:
 
 | HTTP | Uso esperado |
 |---|---|
@@ -200,33 +202,30 @@ Convenção de erros proposta para os endpoints futuros. Os handlers atuais reto
 | `422` | Dados bem formados que falham validação de domínio. |
 | `500` | Erro inesperado, sem stack trace na resposta. |
 
-Validar tipos, campos permitidos e tamanhos; CNPJ/CPF, e-mail, placa e RENAVAM; disponibilidade, ativação e propriedade de veículo em interesse; perfil e status da conta. A política de duplicidade de interesses fora dos estados terminais ainda precisa de decisão.
+Validar tipos, campos permitidos e tamanhos; CNPJ/CPF, e-mail, placa e RENAVAM; disponibilidade, ativação e propriedade de veículo em interesse; perfil e status da conta. A implementação bloqueia duplicidade de interesses `PENDENTE` ou `ACEITO` para o mesmo par empresa/motorista.
 
 ## 11. Pendências técnicas
 
 Não decidir unilateralmente os itens abaixo; alinhar com Samy antes de fechar a implementação:
 
-1. Configuração de sessão em produção e estratégia para invalidar sessões ativas quando uma conta for inativada. O logout existe, mas ainda precisa ser testado.
-2. Acesso atual usa `mysql2/promise`; revisar o uso de pool/transações conforme novas operações forem implementadas.
+1. Renovação de sessão em produção além da duração atual de 24 horas. O logout existe, mas ainda precisa ser testado contra MySQL real.
+2. Acesso atual usa `mysql2/promise`; validar uso de pool/transações com MySQL 8.
 3. Estratégia concorrente para CNPJ globalmente único e perfil exclusivo, sem garantia equivalente no esquema atual.
 4. Normalização, collation e tratamento dos e-mails já existentes.
-5. Configuração UTC da conexão MySQL ou conversões para `DATETIME`.
+5. Configuração UTC da conexão MySQL ou conversões para os demais campos `DATETIME`.
 6. Provisionamento da primeira conta `ADMIN`.
-7. Proteção contra auto-inativação e contra inativar o último administrador.
-8. Política de inativação individual de qualificações; `veiculo.ativo` permite desativação lógica de veículos.
-9. Campos públicos e política de privacidade para busca de motoristas e veículos.
-10. Critérios definitivos de busca e paginação.
-11. Política de duplicidade de interesses fora dos estados `RECUSADO`, `EXPIRADO` e `CANCELADO`.
-12. Campos de perfil editáveis, incluindo alteração de e-mail/documentos.
-13. CORS e detalhes de implantação. O desenvolvimento local usa proxy Vite; o servidor Express atual não configura middleware CORS.
+7. Política de inativação individual de qualificações; `veiculo.ativo` permite desativação lógica de veículos.
+8. Aprovação de produto sobre exibição do nome do motorista na busca; hoje ele é omitido.
+9. Campos de perfil editáveis, incluindo alteração de e-mail/documentos.
+10. Preencher `CORS_ORIGINS` com as origens exatas ao implantar frontend e API em origens distintas.
 
 ## 12. Plano sugerido de continuidade
 
-1. **Completar testes do que existe:** testar logout, incluindo remoção do cookie e confirmação de que a sessão encerrada não é reutilizada.
-2. **Alinhar decisões pendentes:** revisar a seção 11 antes de implementar novas rotas e regras.
-3. **Implementar módulos restantes:** perfis e inativação administrativa; veículos e qualificações; busca e interesses; autorização por perfil/propriedade e validações aprovadas.
-4. **Ampliar a integração React:** implementar somente os fluxos aprovados à medida que os endpoints correspondentes existirem; cadastro e login já estão conectados.
-5. **Verificar e entregar:** testes automatizados/manuais do contrato, regras de segurança e fluxos ponta a ponta; atualizar documentação final.
+1. **Validar com MySQL 8:** executar testes dos fluxos implementados com o banco local, especialmente CRUD de veículos, interesses, sessão e inativação.
+2. **Completar testes do que existe:** testar logout, incluindo remoção do cookie e confirmação de que a sessão encerrada não é reutilizada.
+3. **Provisionar a primeira conta `ADMIN`** por procedimento seguro e restrito.
+4. **Alinhar com o frontend:** avaliar as telas de perfil, veículos, qualificações, busca e interesses sem alterar interfaces sem necessidade.
+5. **Verificar e entregar:** ampliar cobertura dos cenários de concorrência, privacidade e fluxos ponta a ponta; atualizar documentação final.
 
 ## 13. Critérios de conclusão e testes
 
@@ -258,7 +257,7 @@ Conforme validação manual informada por Samy, cadastro de empresa/motorista e 
 
 ## 14. Divisão de responsabilidades e prazo
 
-Prazo informado para o MVP: **30/11/2026**.
+Prazo informado para o MVP: **23/11/2026**.
 
 | Responsável | Responsabilidade |
 |---|---|
@@ -286,4 +285,4 @@ Prazo informado para o MVP: **30/11/2026**.
 - `docs/05_contrato_api_endpoints.md`.
 - Estrutura e arquivos atuais em `backend/` e `frontend/`, incluindo configuração, endpoints existentes e integração dos formulários de cadastro/login.
 
-**Este handoff é documentação de transferência e não implementa nem altera o backend.** As decisões listadas na seção 11 permanecem pendentes de alinhamento. Cadastro, login e sessão existem; logout existe, mas seu teste está pendente.
+**Este handoff registra o estado atual do backend.** As decisões listadas na seção 11 permanecem pendentes de alinhamento; os endpoints descritos como implementados já possuem testes automatizados com banco simulado, mas aguardam validação contra MySQL 8 local. O teste específico de logout também está pendente.

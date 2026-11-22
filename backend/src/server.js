@@ -1,17 +1,41 @@
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import pool from './config/database.js';
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import session from 'express-session';
 import MySQLStoreFactory from 'express-mysql-session';
+import { requireAuthenticatedUser } from './middleware/authorization.js';
+import { createProfileRouter } from './routes/profileRoutes.js';
+import { createVehicleRouter } from './routes/vehicleRoutes.js';
+import { createQualificationRouter } from './routes/qualificationRoutes.js';
+import { createSearchRouter } from './routes/searchRoutes.js';
+import { createInterestRouter, startInterestExpiryWorker } from './routes/interestRoutes.js';
+import { createAdminRouter } from './routes/adminRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'SUBSTITUA_POR_UM_SEGREDO_ALEATORIO_LOCAL') {
+  throw new Error('SESSION_SECRET must be configured before starting the API.');
+}
 const scrypt = promisify(scryptCallback);
 const MySQLStore = MySQLStoreFactory(session);
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+const configuredCorsOrigins = new Set(
+  (process.env.CORS_ORIGINS || '').split(',').map((origin) => origin.trim()).filter(Boolean)
+);
 
 app.use(express.json());
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || configuredCorsOrigins.has(origin)) return callback(null, origin || false);
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type']
+}));
 
 // Sessões armazenadas no MySQL
 const sessionStore = new MySQLStore({}, pool);
@@ -24,11 +48,19 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: false,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 1000 * 60 * 60 * 24
   }
 }));
+
+app.use('/api/v1', createProfileRouter(pool));
+app.use('/api/v1', createVehicleRouter(pool));
+app.use('/api/v1', createQualificationRouter(pool));
+app.use('/api/v1', createSearchRouter(pool));
+app.use('/api/v1', createInterestRouter(pool));
+app.use('/api/v1', createAdminRouter(pool));
+startInterestExpiryWorker(pool);
 
 // Gera o hash da senha
 async function hashPassword(password) {
@@ -365,7 +397,7 @@ app.post('/api/v1/auth/login', async (req, res) => {
 });
 
 // Consultar sessão atual
-app.get('/api/v1/auth/me', (req, res) => {
+app.get('/api/v1/auth/me', requireAuthenticatedUser(pool), (req, res) => {
   if (!req.session.usuario) {
     return res.status(401).json({
       message: 'Usuário não autenticado.'
@@ -415,6 +447,22 @@ app.get('/api/v1/health', async (req, res) => {
       message: 'API funcionando, mas sem conexão com o banco.'
     });
   }
+});
+
+app.use('/api/v1', (req, res) => {
+  return res.status(404).json({ message: 'Rota da API não encontrada.' });
+});
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  if (error.type === 'entity.parse.failed') {
+    return res.status(400).json({ message: 'Corpo JSON inválido.' });
+  }
+  if (error.type === 'entity.too.large') {
+    return res.status(413).json({ message: 'Corpo da requisição excede o limite permitido.' });
+  }
+  console.error('Erro inesperado ao processar requisição da API.');
+  return res.status(500).json({ message: 'Não foi possível processar a requisição.' });
 });
 
 app.listen(PORT, () => {
