@@ -18,12 +18,16 @@ function makePool() {
     get sessionsDeleted() { return sessionsDeleted; },
     async execute(sql, values = []) {
       calls.push({ sql, values });
+      if (sql.startsWith('SELECT COUNT(*) AS total FROM usuario')) return [[{ total: 1 }]];
+      if (sql.includes('FROM usuario u LEFT JOIN empresa')) return [[{ id: 12, email: 'empresa@test.local', tipoUsuario: 'EMPRESA', ativo: 1, nome: 'Empresa' }]];
+      if (sql.startsWith('SELECT COUNT(*) AS total FROM demanda')) return [[{ total: 0 }]];
+      if (sql.includes('FROM demanda d INNER JOIN empresa')) return [[]];
       if (sql.includes('FROM usuario') && sql.includes('tipo_usuario, status')) {
         const user = users.get(Number(values[0]));
         return [user ? [{ ...user }] : []];
       }
-      if (sql.startsWith('UPDATE usuario SET status = FALSE')) {
-        users.get(Number(values[0])).status = 0;
+      if (sql.startsWith('UPDATE usuario SET status = ? WHERE id = ?')) {
+        users.get(Number(values[1])).status = values[0] ? 1 : 0;
         return [{ affectedRows: 1 }];
       }
       if (sql.startsWith('DELETE FROM sessions')) {
@@ -36,6 +40,10 @@ function makePool() {
       return {
         execute: async (sql, values = []) => {
           calls.push({ sql, values });
+          if (sql.includes('FROM usuario') && sql.includes("tipo_usuario = 'ADMIN' AND status = TRUE FOR UPDATE")) {
+            const actor = users.get(Number(values[0]));
+            return [actor?.tipo_usuario === 'ADMIN' && actor.status ? [{ id: actor.id }] : []];
+          }
           if (sql.includes('FROM usuario') && sql.includes('WHERE id = ? FOR UPDATE')) {
             const user = users.get(Number(values[0]));
             return [user ? [{ ...user }] : []];
@@ -43,8 +51,8 @@ function makePool() {
           if (sql.includes("tipo_usuario = 'ADMIN'")) {
             return [[...users.values()].filter((user) => user.tipo_usuario === 'ADMIN' && user.status)];
           }
-          if (sql.startsWith('UPDATE usuario SET status = FALSE')) {
-            users.get(Number(values[0])).status = 0;
+          if (sql.startsWith('UPDATE usuario SET status = ? WHERE id = ?')) {
+            users.get(Number(values[1])).status = values[0] ? 1 : 0;
             return [{ affectedRows: 1 }];
           }
           if (sql.startsWith('DELETE FROM sessions')) {
@@ -86,6 +94,23 @@ async function withApi(run) {
   }
 }
 
+test('ADMIN can query real-backed management endpoints while common accounts are blocked', async () => {
+  await withApi(async (baseUrl, pool) => {
+    const denied = await fetch(`${baseUrl}/api/v1/admin/users`, { headers: { 'x-test-user': '12' } });
+    assert.equal(denied.status, 403);
+    const summary = await fetch(`${baseUrl}/api/v1/admin/dashboard/summary`, { headers: { 'x-test-user': '10' } });
+    assert.equal(summary.status, 200);
+    const listing = await fetch(`${baseUrl}/api/v1/admin/users?q=ana%25&tipo=EMPRESA&page=2&limit=5`, { headers: { 'x-test-user': '10' } });
+    assert.equal(listing.status, 200);
+    const body = await listing.json();
+    assert.equal(body.data[0].nome, 'Empresa');
+    assert.deepEqual(body.meta, { page: 2, limit: 5, total: 1 });
+    const search = pool.calls.find(({ sql }) => sql.includes('e.razao_social LIKE'));
+    assert.ok(search.values.includes('%ana!%%'));
+    const demands = await fetch(`${baseUrl}/api/v1/admin/demands?status=ABERTA`, { headers: { 'x-test-user': '10' } });
+    assert.equal(demands.status, 200);
+  });
+});
 test('ADMIN can logically deactivate a user and invalidate stored sessions', async () => {
   await withApi(async (baseUrl, pool) => {
     const response = await fetch(`${baseUrl}/api/v1/admin/users/12/status`, {
@@ -103,7 +128,7 @@ test('ADMIN can logically deactivate a user and invalidate stored sessions', asy
   });
 });
 
-test('requires ADMIN and disallows reactivation or self-deactivation', async () => {
+test('requires ADMIN and disallows self-deactivation while allowing reactivation', async () => {
   await withApi(async (baseUrl) => {
     const forbidden = await fetch(`${baseUrl}/api/v1/admin/users/12/status`, {
       method: 'PATCH',
@@ -117,7 +142,7 @@ test('requires ADMIN and disallows reactivation or self-deactivation', async () 
       headers: { 'x-test-user': '10', 'content-type': 'application/json' },
       body: JSON.stringify({ status: true })
     });
-    assert.equal(reactivate.status, 400);
+    assert.equal(reactivate.status, 200);
 
     const self = await fetch(`${baseUrl}/api/v1/admin/users/10/status`, {
       method: 'PATCH',

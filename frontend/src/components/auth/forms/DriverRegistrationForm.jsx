@@ -1,5 +1,5 @@
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import FormField from '../FormField.jsx'
 import PasswordConfirmationFields from '../PasswordConfirmationFields.jsx'
 import CnpjField from '../CnpjField.jsx'
@@ -11,9 +11,18 @@ const MAX_VEHICLE_YEAR = new Date().getFullYear() + 1
 function DriverRegistrationForm() {
   const [cnpjValue, setCnpjValue] = useState('')
   const [vehicles, setVehicles] = useState([])
+  const [profilePhoto, setProfilePhoto] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState('')
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState(null)
+
+  useEffect(() => {
+    if (!profilePhoto) { setPhotoPreview(''); return undefined }
+    const previewUrl = URL.createObjectURL(profilePhoto)
+    setPhotoPreview(previewUrl)
+    return () => URL.revokeObjectURL(previewUrl)
+  }, [profilePhoto])
 
   function handleChange() {
     setErrors({})
@@ -48,6 +57,12 @@ function DriverRegistrationForm() {
       nextErrors.confirmPassword = 'As senhas não coincidem.'
     }
 
+    if (profilePhoto && !['image/jpeg', 'image/png'].includes(profilePhoto.type)) {
+      nextErrors.fotoPerfil = 'A foto deve estar no formato JPG ou PNG.'
+    } else if (profilePhoto && profilePhoto.size > 5 * 1024 * 1024) {
+      nextErrors.fotoPerfil = 'A foto pode ter no máximo 5 MB.'
+    }
+
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
       return
@@ -66,9 +81,11 @@ function DriverRegistrationForm() {
         email: email.trim().toLowerCase(),
         senha: password,
         veiculos: vehicles.map((vehicle) => ({ ...vehicle, ano: Number(vehicle.ano) })),
+        fotoPerfil: profilePhoto,
       })
 
       setVehicles([])
+      setProfilePhoto(null)
       setCnpjValue('')
       setFeedback({
         type: 'success',
@@ -115,6 +132,14 @@ function DriverRegistrationForm() {
         />
 
         <CnpjField value={cnpjValue} onValueChange={setCnpjValue} error={errors.cnpj} />
+
+        <div className="auth-field auth-field--full driver-photo-picker">
+          <label htmlFor="fotoPerfil">Foto de perfil <span className="auth-field__optional">(opcional)</span></label>
+          <input id="fotoPerfil" name="fotoPerfil" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" onChange={(event) => setProfilePhoto(event.target.files?.[0] || null)} aria-invalid={Boolean(errors.fotoPerfil)} />
+          <small>JPG ou PNG, até 5 MB. Você poderá adicionar ou trocar a foto depois.</small>
+          {photoPreview && <img className="driver-photo-preview" src={photoPreview} alt="Prévia da foto de perfil" />}
+          {errors.fotoPerfil && <span className="auth-field__error" role="alert">{errors.fotoPerfil}</span>}
+        </div>
 
         <FormField
           id="telefone"

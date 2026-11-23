@@ -15,7 +15,7 @@ function makePool() {
         return [[{ id: userId, tipo_usuario: userId === 1 ? 'EMPRESA' : 'MOTORISTA', status: 1 }]];
       }
       if (sql.includes('COUNT(DISTINCT m.id)')) return [[{ total: 1 }]];
-      if (sql.includes('SELECT m.id, m.disponivel')) return [[{ id: 22, motoristaDisponivel: 1 }]];
+      if (sql.includes('SELECT m.id, m.nome, m.disponivel')) return [[{ id: 22, nome: 'Motorista Teste', motoristaDisponivel: 1, fotoPerfil: null }]];
       if (sql.includes('FROM veiculo WHERE motorista_id IN')) {
         return [[{ id: 33, motoristaId: 22, marca: 'Volvo', modelo: 'VM', ano: 2024, disponivel: 1 }]];
       }
@@ -61,7 +61,7 @@ test('searches only with company access and returns minimal vehicle and qualific
     assert.equal(body.data[0].motoristaDisponivel, true);
     assert.deepEqual(body.data[0].qualificacoes, ['Transporte biológico']);
     assert.equal(body.data[0].veiculos[0].disponivel, true);
-    assert.equal(Object.hasOwn(body.data[0], 'nome'), false);
+    assert.equal(body.data[0].nome, 'Motorista Teste');
     assert.equal(Object.hasOwn(body.data[0].veiculos[0], 'placa'), false);
     const count = pool.calls.find(({ sql }) => sql.includes('COUNT(DISTINCT m.id)'));
     assert.ok(count.sql.includes('EXISTS'));

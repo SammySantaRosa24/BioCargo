@@ -21,12 +21,21 @@ export async function registerCompany(companyData) {
 
 // Cadastro de motorista PJ
 export async function registerDriver(driverData) {
+  const requestBody = driverData.fotoPerfil
+    ? (() => {
+      const body = new FormData()
+      for (const [key, value] of Object.entries(driverData)) {
+        if (key === 'fotoPerfil') body.append(key, value)
+        else if (key === 'veiculos') body.append(key, JSON.stringify(value))
+        else if (value != null) body.append(key, String(value))
+      }
+      return body
+    })()
+    : JSON.stringify(driverData)
   const response = await fetch(`${API_BASE_URL}/auth/register/driver`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(driverData),
+    ...(driverData.fotoPerfil ? {} : { headers: { 'Content-Type': 'application/json' } }),
+    body: requestBody,
   })
 
   const result = await response.json()
@@ -145,4 +154,50 @@ export async function completeDriverService(demandId, formData) {
   return (await demandRequest(`/drivers/me/services/${demandId}/complete`, {
     method: 'POST', body: formData,
   })).data
+}
+
+export async function getDriverProfile() {
+  return (await demandRequest('/drivers/me')).data
+}
+
+export async function updateDriverProfile(fields) {
+  return (await demandRequest('/drivers/me', { method: 'PATCH', body: JSON.stringify(fields) })).data
+}
+
+export async function uploadDriverPhoto(file) {
+  const body = new FormData()
+  body.set('fotoPerfil', file)
+  return (await demandRequest('/drivers/me/photo', { method: 'PUT', body })).data
+}
+
+export async function searchCompanyDrivers({ q = '', page = 1, limit = 20 } = {}) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (q.trim()) params.set('q', q.trim())
+  return demandRequest(`/drivers?${params.toString()}`)
+}
+
+export async function getAdminSummary() {
+  return (await demandRequest('/admin/dashboard/summary')).data
+}
+
+export async function listAdminUsers(filters = {}) {
+  const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== '' && value != null).map(([key, value]) => [key, String(value)]))
+  return demandRequest(`/admin/users?${params.toString()}`)
+}
+
+export async function getAdminUser(id) {
+  return (await demandRequest(`/admin/users/${id}`)).data
+}
+
+export async function updateAdminUserStatus(id, status) {
+  return (await demandRequest(`/admin/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })).data
+}
+
+export async function listAdminDemands(filters = {}) {
+  const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== '' && value != null).map(([key, value]) => [key, String(value)]))
+  return demandRequest(`/admin/demands?${params.toString()}`)
+}
+
+export async function getAdminDemand(id) {
+  return (await demandRequest(`/admin/demands/${id}`)).data
 }

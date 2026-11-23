@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { completeDriverService, getDriverServiceSummary, listDriverDemands, listDriverServices, submitDriverInterest } from '../services/api.js'
+import { Link } from 'react-router-dom'
+import { completeDriverService, getDriverProfile, getDriverServiceSummary, listDriverDemands, listDriverServices, submitDriverInterest } from '../services/api.js'
 import DemandStatus from '../components/company/DemandStatus.jsx'
 import { formatDemandDate } from '../components/company/demandFormat.js'
 
@@ -24,9 +25,13 @@ function ServiceCard({ service, onRefresh }) {
     const form = event.currentTarget
     if (!file) { setMessage('Anexe a imagem do comprovante.'); return }
     if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024) { setMessage('Escolha uma imagem JPG ou PNG de até 5 MB.'); return }
-    if (!window.confirm('Confirma o registro da conclusão? Depois de enviada, a comprovação não poderá ser substituída.')) return
+    const formData = new FormData(form)
+    if (!formData.get('dataEntrega')) { setMessage('Informe a data efetiva da entrega.'); return }
+    if (!formData.get('horarioEntrega')) { setMessage('Informe o horÃ¡rio efetivo da entrega.'); return }
+    if (!String(formData.get('nomeRecebedor') || '').trim()) { setMessage('Informe o nome completo de quem recebeu o material.'); return }
+    if (!String(formData.get('observacoes') || '').trim()) { setMessage('Informe as observaÃ§Ãµes sobre a entrega.'); return }    if (!window.confirm('Confirma o registro da conclusão? Depois de enviada, a comprovação não poderá ser substituída.')) return
     setBusy(true); setMessage('')
-    const body = new FormData(form)
+    const body = formData
     body.set('comprovante', file)
     try {
       await completeDriverService(service.demandaId, body)
@@ -55,12 +60,12 @@ function ServiceCard({ service, onRefresh }) {
         <label className="demand-field">Data efetiva da entrega<input name="dataEntrega" type="date" required /></label>
         <label className="demand-field">Horário efetivo<input name="horarioEntrega" type="time" required /></label>
         <label className="demand-field demand-field--full">Nome completo de quem recebeu<input name="nomeRecebedor" maxLength="255" required /></label>
-        <label className="demand-field demand-field--full">Observações<textarea name="observacoes" maxLength="2000" rows="3" /></label>
+        <label className="demand-field demand-field--full">Observações<textarea name="observacoes" maxLength="2000" rows="3" required /></label>
       </div>
       {message && <p role="status" className="dashboard-alert">{message}</p>}
       <button className="dashboard-button" type="submit" disabled={busy}>{busy ? 'Enviando...' : 'Registrar conclusão'}</button>
     </form>}
-    {service.comprovanteId && <div className="driver-proof-record"><b>Entrega recebida por:</b> {service.nomeRecebedor} · {formatDemandDate(service.dataEntrega)} às {service.horarioEntrega}<br />{service.observacoes && <span>{service.observacoes}<br /></span>}<a href={`/api/v1/demands/${service.demandaId}/proof`} target="_blank" rel="noreferrer">Consultar comprovante</a></div>}
+    {service.comprovanteId && <div className="driver-proof-record"><b>Entrega recebida por:</b> {service.nomeRecebedor} · {formatDemandDate(service.dataEntrega)} às {service.horarioEntrega}<br /><span>{service.observacoes}<br /></span><a href={`/api/v1/demands/${service.demandaId}/proof`} target="_blank" rel="noreferrer">Consultar comprovante</a></div>}
     {message && !showForm && <p role="status">{message}</p>}
   </article>
 }
@@ -88,15 +93,17 @@ export default function DriverDashboardPage() {
   const [opportunities, setOpportunities] = useState([])
   const [active, setActive] = useState([])
   const [history, setHistory] = useState([])
+  const [profile, setProfile] = useState(null)
+  const [photoFailed, setPhotoFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const load = useCallback(async () => {
     setError('')
     try {
-      const [metrics, available, services, past] = await Promise.all([
-        getDriverServiceSummary(), listDriverDemands({ page: 1, limit: 100 }), listDriverServices('ativas'), listDriverServices('historico'),
+      const [metrics, available, services, past, ownProfile] = await Promise.all([
+        getDriverServiceSummary(), listDriverDemands({ page: 1, limit: 100 }), listDriverServices('ativas'), listDriverServices('historico'), getDriverProfile(),
       ])
-      setSummary(metrics); setOpportunities(available.data); setActive(services); setHistory(past)
+      setSummary(metrics); setOpportunities(available.data); setActive(services); setHistory(past); setProfile(ownProfile); setPhotoFailed(false)
     } catch (e) { setError(e.message) }
     finally { setLoading(false) }
   }, [])
@@ -109,6 +116,13 @@ export default function DriverDashboardPage() {
     {error && <div className="dashboard-alert" role="alert">{error}<button type="button" onClick={load}>Tentar novamente</button></div>}
     {loading ? <div className="dashboard-state">Carregando seus serviços...</div> : <>
       <div className="dashboard-metrics">{cards.map(([key, label]) => <article className="dashboard-metric" key={key}><span>{label}</span><strong>{summary?.[key] || 0}</strong></article>)}</div>
+      {profile && <section className="driver-identity-card">
+        <div className="driver-identity-avatar">
+          {profile.fotoDisponivel && !photoFailed ? <img src={`/api/v1/drivers/me/photo?v=${encodeURIComponent(profile.id)}`} alt={`Foto de ${profile.nome}`} onError={() => setPhotoFailed(true)} /> : <span>{profile.nome.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span>}
+        </div>
+        <div><span className="dashboard-eyebrow">PERFIL DO MOTORISTA</span><h2>{profile.nome}</h2></div>
+        <Link className="dashboard-button dashboard-button--secondary" to="/motorista/perfil">Editar perfil</Link>
+      </section>}
       <section id="oportunidades" className="dashboard-section"><div className="dashboard-section__heading"><div><h2>Oportunidades</h2><span>{opportunities.length} demandas disponíveis</span></div></div>{opportunities.length ? <div className="demand-list">{opportunities.map((d) => <OpportunityCard key={d.id} demand={d} onRefresh={load} />)}</div> : <div className="dashboard-empty">Não há demandas disponíveis neste momento.</div>}</section>
       <section id="meus-servicos" className="dashboard-section"><div className="dashboard-section__heading"><div><h2>Meus serviços</h2><span>Interesses enviados e operações em andamento</span></div></div>{active.length ? <div className="demand-list">{active.map((s) => <ServiceCard key={s.interesseId} service={s} onRefresh={load} />)}</div> : <div className="dashboard-empty">Você ainda não tem serviços ativos.</div>}</section>
       <section id="historico" className="dashboard-section"><div className="dashboard-section__heading"><div><h2>Histórico</h2><span>Serviços finalizados ou cancelados</span></div></div>{history.length ? <div className="demand-list">{history.map((s) => <ServiceCard key={s.interesseId} service={s} onRefresh={load} />)}</div> : <div className="dashboard-empty">Seu histórico aparecerá aqui.</div>}</section>

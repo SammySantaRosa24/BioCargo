@@ -62,7 +62,7 @@ As respostas e status acima refletem o código atual, não uma promessa de cober
 
 ### Endpoints ainda planejados
 
-As propostas para busca, qualificações, interesses e administração nas seções seguintes são referência de escopo e contrato futuro. Perfis próprios e gestão de veículos estão implementados, conforme as seções 3 a 5.
+Busca, qualificacoes, interesses, administracao, fotos e demandas estao implementados nos modulos descritos neste contrato.
 
 ### Cadastro de empresa
 
@@ -390,11 +390,11 @@ O prazo `dataLimiteResposta` é 24 horas após `dataCriacao`. Sem resposta, o in
 |---|---|---|---|---|---|
 | `PATCH /api/v1/admin/users/:id/status` | Inativar logicamente uma conta. Define `usuario.status = FALSE`, bloqueia o acesso, invalida as sessões ativas do usuário e preserva registros e histórico. | `ADMIN` autenticado e autorizado | `id` na URL; corpo `{ "status": false }`. | `200 OK`, usuário inativado sem dados de senha. | `400`, `401`, `403`, `404`, `422`, `500` |
 
-**Status da Etapa F:** o endpoint está implementado. Requer `ADMIN` ativo, aceita somente `status: false`, impede auto-inativação e protege o último administrador ativo. A alteração e a remoção das sessões persistidas são feitas na mesma transação. Reativação não é permitida por esta rota.
+**Status da Etapa F:** painel ADMIN, listagem e detalhes de usuarios/demandas, filtros, ativacao e inativacao logicas estao implementados. Requer ADMIN ativo, permite `status: true|false`, impede auto-inativacao e protege o ultimo administrador. A inativacao invalida sessoes na mesma transacao.
 
 Não há endpoint de exclusão física. A reativação de usuários não está incluída nesta proposta.
 
-Ainda precisa ser definido o provisionamento seguro da primeira conta `ADMIN`. A rota impede auto-inativação e inativação do último administrador ativo.
+O primeiro ADMIN e provisionado somente por script local `npm run admin:provision`, condicionado a NODE_ENV development/test e credenciais informadas pelo ambiente.
 
 ## 10. Padrão de requisição e resposta por endpoint
 
@@ -595,7 +595,7 @@ As rotas abaixo exigem sessão ativa e perfil `EMPRESA`; os IDs e a empresa prop
 | `POST /api/v1/demands/:id/interests` | Registra manifestação de interesse do motorista; aceita `veiculoId` opcional. |
 | `GET /api/v1/drivers/me/services/summary` | Indicadores privados do dashboard do motorista autenticado. |
 | `GET /api/v1/drivers/me/services?grupo=ativas|historico` | Serviços e histórico de interesses vinculados ao motorista. |
-| `POST /api/v1/drivers/me/services/:id/complete` | Finaliza serviço em andamento; multipart com `comprovante` (JPG/PNG até 5 MB), `dataEntrega` (YYYY-MM-DD), `horarioEntrega` (HH:mm), `nomeRecebedor` e `observacoes` opcional (até 2.000 caracteres). Exige motorista responsável e interesse aceito. Retorna 201 com status `FINALIZADA`; rejeita duplicidade com 409. |
+| `POST /api/v1/drivers/me/services/:id/complete` | Finaliza servico em andamento; multipart com `comprovante` JPG/PNG ate 5 MB, `dataEntrega` (YYYY-MM-DD), `horarioEntrega` (HH:mm), `nomeRecebedor` e `observacoes` obrigatorios (1 a 2.000 caracteres apos trim). Exige motorista responsavel e interesse aceito. Retorna 201; bloqueia duplicidade com 409. |
 | `GET /api/v1/demands/:id/proof` | Imagem privada do comprovante; exige empresa proprietária, motorista responsável ou `ADMIN` autenticado. Retorna imagem inline, sem URL pública. |
 
 Os status de demanda são `ABERTA`, `EM_NEGOCIACAO`, `EM_ANDAMENTO`, `FINALIZADA`, `CANCELADA` e `EXPIRADA`. A empresa executa as transições até `EM_ANDAMENTO`; somente o motorista responsável conclui o serviço com comprovante obrigatório. A listagem `ativas` inclui abertas, em negociação e em andamento; `historico` inclui finalizadas, canceladas e expiradas.
@@ -603,3 +603,8 @@ Os status de demanda são `ABERTA`, `EM_NEGOCIACAO`, `EM_ANDAMENTO`, `FINALIZADA
 O comprovante é armazenado no diretório local privado configurado por `DELIVERY_PROOF_STORAGE_DIR` (ou `backend/storage/private/delivery-proofs`). Ele não fica no diretório público da aplicação nem é servido estaticamente. O banco guarda apenas nome aleatório, tipo, tamanho e metadados da entrega. Em produção, o diretório deve ser persistente e acessível apenas à conta do serviço. Execute `database/migrations/20261123_003_create_comprovante_entrega.sql` em instalações existentes.
 
 Em bancos existentes, execute `database/migrations/20261123_002_create_demanda.sql` uma vez, depois do schema e migrações anteriores. Para instalações novas, `database/01_schema.sql` já contém as tabelas e relações atualizadas.
+
+
+## Atualizacao: painel ADMIN, fotos de motorista e conclusao obrigatoria
+
+Consulte [docs/07_admin_fotos_conclusao.md](07_admin_fotos_conclusao.md) para rotas, campos, permissoes, provisionamento local e migracoes. O endpoint de conclusao exige comprovante, data, horario, recebedor e observacoes nao vazias. O antigo status de etapa futura do painel ADMIN foi substituido pelas rotas implementadas e documentadas.

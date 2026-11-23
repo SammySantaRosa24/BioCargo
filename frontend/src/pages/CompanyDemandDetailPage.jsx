@@ -114,7 +114,7 @@ function CompanyDemandDetailPage() {
         <dl className="demand-detail-grid">
           <div><dt>Entrega efetiva</dt><dd>{formatDemandDate(demand.dataEntrega)} às {demand.horarioEntrega}</dd></div>
           <div><dt>Recebido por</dt><dd>{demand.nomeRecebedor}</dd></div>
-          {demand.observacoesEntrega && <div><dt>Observações do motorista</dt><dd>{demand.observacoesEntrega}</dd></div>}
+          <div><dt>Observações do motorista</dt><dd>{demand.observacoesEntrega}</dd></div>
           <div><dt>Comprovante enviado</dt><dd>{new Date(demand.comprovanteEnviadoEm).toLocaleString('pt-BR')}</dd></div>
         </dl>
         <a className="dashboard-button" href={`/api/v1/demands/${demand.id}/proof`} target="_blank" rel="noreferrer">Visualizar imagem do comprovante</a>

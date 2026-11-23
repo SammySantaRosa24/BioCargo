@@ -1,60 +1,17 @@
-import express, { Router } from 'express';
-import { randomUUID } from 'node:crypto';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { Router } from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { requireAuthenticatedUser } from '../middleware/authorization.js';
+import { inspectPrivateImage, optionalMultipartRaw, parseMultipartBody, removePrivateFile, storePrivateImage } from '../utils/privateImages.js';
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_STORAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../storage/private/delivery-proofs');
 
-function parseMultipart(buffer, contentType) {
-  const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType)?.slice(1).find(Boolean)?.trim();
-  if (!boundary || !Buffer.isBuffer(buffer)) return { error: 'Envie um formulário multipart válido.' };
-  const delimiter = Buffer.from(`--${boundary}`);
-  const result = {};
-  let cursor = buffer.indexOf(delimiter);
-  if (cursor < 0) return { error: 'Formulário multipart inválido.' };
-  while (cursor >= 0) {
-    cursor += delimiter.length;
-    if (buffer.subarray(cursor, cursor + 2).toString() === '--') break;
-    if (buffer.subarray(cursor, cursor + 2).toString() === '\r\n') cursor += 2;
-    const headerEnd = buffer.indexOf(Buffer.from('\r\n\r\n'), cursor);
-    if (headerEnd < 0) return { error: 'Cabeçalho multipart inválido.' };
-    const headers = buffer.subarray(cursor, headerEnd).toString('latin1');
-    const name = /(?:^|;)\s*name="([^"\r\n]+)"/i.exec(headers)?.[1];
-    if (!name || Object.hasOwn(result, name)) return { error: 'Campo multipart ausente ou duplicado.' };
-    const valueStart = headerEnd + 4;
-    const next = buffer.indexOf(delimiter, valueStart);
-    if (next < 0) return { error: 'Final do formulário multipart ausente.' };
-    let valueEnd = next;
-    if (buffer.subarray(valueEnd - 2, valueEnd).toString() === '\r\n') valueEnd -= 2;
-    const bytes = buffer.subarray(valueStart, valueEnd);
-    if (/filename="[^"]*"/i.test(headers)) {
-      const mime = /(?:^|\r\n)content-type:\s*([^\r\n]+)/i.exec(headers)?.[1]?.trim().toLowerCase();
-      result[name] = { bytes, mime };
-    } else result[name] = bytes.toString('utf8');
-    cursor = next;
-  }
-  return { fields: result };
+function isValidDeliveryDate(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 }
 
-function sniffImage(file) {
-  if (!file || !Buffer.isBuffer(file.bytes) || file.bytes.length < 12 || file.bytes.length > MAX_IMAGE_BYTES) return null;
-  const b = file.bytes;
-  const png = b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) && b.subarray(-8, -4).toString() === 'IEND';
-  const jpeg = b[0] === 0xff && b[1] === 0xd8 && b[b.length - 2] === 0xff && b[b.length - 1] === 0xd9;
-  if (png && file.mime === 'image/png') return { mime: 'image/png', extension: 'png' };
-  if (jpeg && ['image/jpeg', 'image/jpg', 'image/pjpeg'].includes(file.mime)) return { mime: 'image/jpeg', extension: 'jpg' };
-  return null;
-}
-
-function parseDateTime(fields) {
-  const date = fields.dataEntrega;
-  const time = fields.horarioEntrega;
-  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(`${date}T00:00:00Z`)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) return false;
-  if (typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return false;
-  return true;
+function isValidDeliveryTime(value) {
+  return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
 export function createDeliveryRouter(pool, { storageDir = process.env.DELIVERY_PROOF_STORAGE_DIR || DEFAULT_STORAGE } = {}) {
@@ -108,27 +65,28 @@ export function createDeliveryRouter(pool, { storageDir = process.env.DELIVERY_P
     } catch { return res.status(500).json({ message: 'Não foi possível carregar seus serviços.' }); }
   });
 
-  router.post('/drivers/me/services/:id/complete', requireDriver, expressRaw(), async (req, res) => {
+  router.post('/drivers/me/services/:id/complete', requireDriver, optionalMultipartRaw('6mb'), async (req, res) => {
     const demandId = /^[1-9]\d*$/.test(req.params.id) ? Number(req.params.id) : null;
     if (!demandId || !Number.isSafeInteger(demandId)) return res.status(400).json({ message: 'ID de demanda inválido.' });
-    const parsed = parseMultipart(req.body, req.headers['content-type'] || '');
+    const parsed = parseMultipartBody(req.body, req.headers['content-type'] || '');
     if (parsed.error) return res.status(400).json({ message: parsed.error });
     const fields = parsed.fields;
     if (Object.keys(fields).some((key) => !['comprovante', 'dataEntrega', 'horarioEntrega', 'nomeRecebedor', 'observacoes'].includes(key))) return res.status(400).json({ message: 'O formulário contém campos não permitidos.' });
-    const image = sniffImage(fields.comprovante);
-    if (!image) return res.status(422).json({ message: 'Envie um comprovante JPG ou PNG válido de até 5 MB.' });
+    const image = inspectPrivateImage(fields.comprovante);
+    if (!image) return res.status(422).json({ message: 'O comprovante deve ser uma imagem JPG ou PNG valida de ate 5 MB.', errors: { comprovante: 'Selecione uma imagem valida.' } });
     const receiver = fields.nomeRecebedor;
-    const notes = fields.observacoes || '';
-    if (!parseDateTime(fields) || typeof receiver !== 'string' || !receiver.trim() || receiver.trim().length > 255 || typeof notes !== 'string' || notes.length > 2000) return res.status(422).json({ message: 'Informe data, horário e nome do recebedor válidos. Observações podem ter até 2.000 caracteres.' });
+    const notes = fields.observacoes;
+    const errors = {};
+    if (!isValidDeliveryDate(fields.dataEntrega)) errors.dataEntrega = 'Informe uma data valida no formato AAAA-MM-DD.';
+    if (!isValidDeliveryTime(fields.horarioEntrega)) errors.horarioEntrega = 'Informe um horario valido no formato HH:mm.'
+    if (typeof receiver !== 'string' || !receiver.trim() || receiver.trim().length > 255) errors.nomeRecebedor = 'Informe o nome completo de quem recebeu (ate 255 caracteres).';
+    if (typeof notes !== 'string' || !notes.trim() || notes.trim().length > 2000) errors.observacoes = 'Informe as observacoes da entrega (ate 2.000 caracteres).';
+    if (Object.keys(errors).length) return res.status(422).json({ message: 'Revise os campos obrigatorios da conclusao.', errors });
 
-    const filename = `${randomUUID()}.${image.extension}`;
-    const filePath = path.join(storageDir, filename);
     let connection;
-    let stored = false;
+    let storedFile;
     try {
-      await mkdir(storageDir, { recursive: true });
-      await writeFile(filePath, fields.comprovante.bytes, { flag: 'wx', mode: 0o600 });
-      stored = true;
+      storedFile = await storePrivateImage(fields.comprovante, storageDir, image);
       connection = await pool.getConnection();
       await connection.beginTransaction();
       const [rows] = await connection.execute(
@@ -138,28 +96,28 @@ export function createDeliveryRouter(pool, { storageDir = process.env.DELIVERY_P
          WHERE d.id = ? AND m.usuario_id = ? FOR UPDATE`,
         [demandId, req.authenticatedUser.id]
       );
-      if (!rows[0]) { await connection.rollback(); await rm(filePath, { force: true }); return res.status(404).json({ message: 'Serviço aceito não encontrado para este motorista.' }); }
+      if (!rows[0]) { await connection.rollback(); await removePrivateFile(storedFile.path); return res.status(404).json({ message: 'Servico aceito nao encontrado para este motorista.' }); }
       if (rows[0].demandaStatus !== 'EM_ANDAMENTO') {
-        await connection.rollback(); await rm(filePath, { force: true });
-        return res.status(409).json({ message: rows[0].demandaStatus === 'FINALIZADA' ? 'Este serviço já foi finalizado.' : 'O serviço precisa estar em andamento para ser concluído.' });
+        await connection.rollback(); await removePrivateFile(storedFile.path);
+        return res.status(409).json({ message: rows[0].demandaStatus === 'FINALIZADA' ? 'Este servico ja foi finalizado.' : 'O servico precisa estar em andamento para ser concluido.' });
       }
       const [existing] = await connection.execute('SELECT id FROM comprovante_entrega WHERE demanda_id = ? LIMIT 1 FOR UPDATE', [demandId]);
-      if (existing.length) { await connection.rollback(); await rm(filePath, { force: true }); return res.status(409).json({ message: 'Este serviço já foi finalizado e possui comprovante.' }); }
+      if (existing.length) { await connection.rollback(); await removePrivateFile(storedFile.path); return res.status(409).json({ message: 'Este servico ja foi finalizado e possui comprovante.' }); }
       await connection.execute(
         `INSERT INTO comprovante_entrega (demanda_id, interesse_id, motorista_id, nome_arquivo, mime_type, tamanho_bytes,
           data_entrega, horario_entrega, nome_recebedor, observacoes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [demandId, rows[0].interesseId, rows[0].motoristaId, filename, image.mime, fields.comprovante.bytes.length, fields.dataEntrega, `${fields.horarioEntrega}:00`, receiver.trim(), notes.trim() || null]
+        [demandId, rows[0].interesseId, rows[0].motoristaId, storedFile.filename, image.mime, fields.comprovante.bytes.length, fields.dataEntrega, `${fields.horarioEntrega}:00`, receiver.trim(), notes.trim()]
       );
       const [updated] = await connection.execute("UPDATE demanda SET status = 'FINALIZADA' WHERE id = ? AND status = 'EM_ANDAMENTO'", [demandId]);
       if (!updated.affectedRows) throw new Error('status_changed');
       await connection.commit();
-      return res.status(201).json({ data: { demandaId: demandId, status: 'FINALIZADA', dataEntrega: fields.dataEntrega, horarioEntrega: fields.horarioEntrega, nomeRecebedor: receiver.trim() } });
+      return res.status(201).json({ data: { demandaId: demandId, status: 'FINALIZADA', dataEntrega: fields.dataEntrega, horarioEntrega: fields.horarioEntrega, nomeRecebedor: receiver.trim(), observacoes: notes.trim() } });
     } catch (error) {
       if (connection) await connection.rollback();
-      if (stored) await rm(filePath, { force: true }).catch(() => {});
-      if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Este serviço já possui uma conclusão registrada.' });
-      return res.status(500).json({ message: 'Não foi possível registrar a conclusão do serviço.' });
+      if (storedFile) await removePrivateFile(storedFile.path).catch(() => {});
+      if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Este servico ja possui uma conclusao registrada.' });
+      return res.status(500).json({ message: 'Nao foi possivel registrar a conclusao do servico.' });
     } finally { connection?.release(); }
   });
 
@@ -189,15 +147,4 @@ export function createDeliveryRouter(pool, { storageDir = process.env.DELIVERY_P
     } catch { return res.status(500).json({ message: 'Não foi possível consultar o comprovante.' }); }
   });
   return router;
-}
-
-function expressRaw() {
-  return (req, res, next) => {
-    const type = req.headers['content-type'] || '';
-    if (!type.toLowerCase().startsWith('multipart/form-data;')) return res.status(415).json({ message: 'Envie o comprovante como multipart/form-data.' });
-    express.raw({ type: 'multipart/form-data', limit: '6mb' })(req, res, (error) => {
-      if (error) return res.status(error.status === 413 ? 413 : 400).json({ message: error.status === 413 ? 'O formulário excede o tamanho permitido.' : 'Não foi possível ler o formulário de conclusão.' });
-      next();
-    });
-  };
 }

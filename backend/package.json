@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "db:start:local": "powershell -ExecutionPolicy Bypass -File scripts/startLocalMySql.ps1",
     "seed:test": "node scripts/seedTestUsers.js",
+    "admin:provision": "node scripts/provisionAdmin.js",
     "test": "node test/run.js",
     "test:mysql": "node --test test/searchRoutes.mysql.test.js"
   },

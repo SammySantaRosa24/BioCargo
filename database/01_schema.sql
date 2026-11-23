@@ -29,6 +29,7 @@ CREATE TABLE motorista (
     cpf VARCHAR(14) NOT NULL UNIQUE,
     cnpj VARCHAR(18) NOT NULL UNIQUE,
     telefone VARCHAR(20),
+    foto_perfil_arquivo VARCHAR(100) NULL,
     disponivel BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_motorista_usuario
         FOREIGN KEY (usuario_id)
@@ -126,7 +127,7 @@ CREATE TABLE comprovante_entrega (
     data_entrega DATE NOT NULL,
     horario_entrega TIME NOT NULL,
     nome_recebedor VARCHAR(255) NOT NULL,
-    observacoes VARCHAR(2000) NULL,
+    observacoes VARCHAR(2000) NOT NULL,
     enviado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_comprovante_demanda FOREIGN KEY (demanda_id) REFERENCES demanda(id),
     CONSTRAINT fk_comprovante_interesse FOREIGN KEY (interesse_id) REFERENCES interesse(id),

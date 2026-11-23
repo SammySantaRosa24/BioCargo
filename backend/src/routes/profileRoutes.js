@@ -18,7 +18,13 @@ const DRIVER_FIELDS = {
 };
 
 function driverProfile(row) {
-  return { ...row, disponivel: Boolean(row.disponivel) };
+  const { fotoPerfilArquivo, ...profile } = row;
+  return {
+    ...profile,
+    disponivel: Boolean(row.disponivel),
+    fotoDisponivel: Boolean(fotoPerfilArquivo),
+    fotoUrl: fotoPerfilArquivo ? '/api/v1/drivers/me/photo' : null,
+  };
 }
 
 function buildUpdate(fields, body) {
@@ -129,7 +135,7 @@ export function createProfileRouter(pool) {
   router.get('/drivers/me', requireAuthenticatedUser(pool, ['MOTORISTA']), async (req, res) => {
     try {
       const [rows] = await pool.execute(
-        `SELECT id, nome, cpf, cnpj, telefone, disponivel
+        `SELECT id, nome, cpf, cnpj, telefone, disponivel, foto_perfil_arquivo AS fotoPerfilArquivo
          FROM motorista WHERE usuario_id = ? LIMIT 1`,
         [req.authenticatedUser.id]
       );
@@ -178,7 +184,7 @@ export function createProfileRouter(pool) {
         [...update.values, req.authenticatedUser.id]
       );
       const [rows] = await pool.execute(
-        `SELECT id, nome, cpf, cnpj, telefone, disponivel
+        `SELECT id, nome, cpf, cnpj, telefone, disponivel, foto_perfil_arquivo AS fotoPerfilArquivo
          FROM motorista WHERE usuario_id = ? LIMIT 1`,
         [req.authenticatedUser.id]
       );

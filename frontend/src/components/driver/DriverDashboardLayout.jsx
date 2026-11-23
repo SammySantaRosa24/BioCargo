@@ -35,6 +35,7 @@ export default function DriverDashboardLayout() {
       <span className="company-sidebar__label">ÁREA DO MOTORISTA</span>
       <nav aria-label="Navegação do dashboard">
         <NavLink to="/motorista" end>Visão geral</NavLink>
+        <NavLink to="/motorista/perfil">Meu perfil</NavLink>
         <a href="#oportunidades">Oportunidades</a>
         <a href="#meus-servicos">Meus serviços</a>
         <a href="#historico">Histórico</a>

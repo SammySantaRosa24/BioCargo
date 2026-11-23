@@ -37,6 +37,11 @@ function LoginPage() {
         return
       }
 
+      if (result.usuario.tipoUsuario === 'ADMIN') {
+        navigate('/admin', { replace: true })
+        return
+      }
+
       setFeedback({
         type: 'success',
         message: 'Login realizado com sucesso!',

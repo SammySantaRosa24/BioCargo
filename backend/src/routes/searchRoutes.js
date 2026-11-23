@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuthenticatedUser } from '../middleware/authorization.js';
 
 const ALLOWED_QUERY_FIELDS = new Set([
-  'veiculoDisponivel', 'marca', 'modelo', 'ano', 'qualificacao', 'page', 'limit'
+  'q', 'veiculoDisponivel', 'marca', 'modelo', 'ano', 'qualificacao', 'page', 'limit'
 ]);
 
 function escapeLike(value) {
@@ -14,6 +14,11 @@ function parseSearchQuery(query) {
   if (unknown) return { error: `Filtro não permitido: ${unknown}.`, status: 400 };
 
   const parsed = { page: 1, limit: 20, vehicleConditions: ['ativo = TRUE'], vehicleValues: [] };
+  if (query.q !== undefined) {
+    if (typeof query.q !== 'string' || !query.q.trim()) return { error: 'q deve ser texto não vazio.', status: 400 };
+    if (query.q.trim().length > 255) return { error: 'q excede o comprimento permitido.', status: 422 };
+    parsed.nameValue = `%${escapeLike(query.q.trim())}%`;
+  }
   if (query.veiculoDisponivel !== undefined) {
     if (!['true', 'false'].includes(query.veiculoDisponivel)) {
       return { error: 'veiculoDisponivel deve ser true ou false.', status: 400 };
@@ -69,6 +74,10 @@ function parseSearchQuery(query) {
 function buildDriverConditions(parsed) {
   const conditions = ['u.status = TRUE', 'm.disponivel = TRUE'];
   const values = [];
+  if (parsed.nameValue !== undefined) {
+    conditions.push('m.nome LIKE ? ESCAPE \'!\'');
+    values.push(parsed.nameValue);
+  }
   if (parsed.vehicleConditions.length > 1) {
     conditions.push(`EXISTS (
       SELECT 1 FROM veiculo vf WHERE vf.motorista_id = m.id
@@ -102,7 +111,7 @@ export function createSearchRouter(pool) {
       );
       const total = Number(countRows[0]?.total || 0);
       const [drivers] = await pool.execute(
-        `SELECT m.id, m.disponivel AS motoristaDisponivel
+        `SELECT m.id, m.nome, m.disponivel AS motoristaDisponivel, m.foto_perfil_arquivo AS fotoPerfil
          FROM motorista m INNER JOIN usuario u ON u.id = m.usuario_id
          WHERE ${conditions.sql} ORDER BY m.id LIMIT ? OFFSET ?`,
         [...conditions.values, parsed.limit, (parsed.page - 1) * parsed.limit]
@@ -129,7 +138,9 @@ export function createSearchRouter(pool) {
 
       const result = new Map(drivers.map((driver) => [driver.id, {
         id: driver.id,
+        nome: driver.nome,
         motoristaDisponivel: Boolean(driver.motoristaDisponivel),
+        fotoUrl: driver.fotoPerfil ? `/api/v1/drivers/${driver.id}/photo` : null,
         veiculos: [],
         qualificacoes: []
       }]));

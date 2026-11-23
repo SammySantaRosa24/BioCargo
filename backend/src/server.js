@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import path from 'node:path';
 import cors from 'cors';
 import pool from './config/database.js';
 import session from 'express-session';
@@ -13,12 +14,15 @@ import { createInterestRouter, startInterestExpiryWorker } from './routes/intere
 import { createAdminRouter } from './routes/adminRoutes.js';
 import { createDemandRouter } from './routes/demandRoutes.js';
 import { createDeliveryRouter } from './routes/deliveryRoutes.js';
+import { createDriverPhotoRouter } from './routes/driverPhotoRoutes.js';
 import { isValidCnpj, normalizeCnpj } from './utils/brazilianDocuments.js';
 import { hashPassword, verifyPassword } from './utils/passwords.js';
 import { isCnpjAvailable } from './utils/registrationValidation.js';
+import { inspectPrivateImage, optionalMultipartRaw, parseMultipartBody, removePrivateFile, storePrivateImage } from './utils/privateImages.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const driverPhotoStorageDir = path.resolve(process.env.DRIVER_PHOTO_STORAGE_DIR || './storage/private/driver-photos');
 if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'SUBSTITUA_POR_UM_SEGREDO_ALEATORIO_LOCAL') {
   throw new Error('SESSION_SECRET must be configured before starting the API.');
 }
@@ -35,7 +39,7 @@ app.use(cors({
     return callback(null, false);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'OPTIONS'],
   allowedHeaders: ['Content-Type']
 }));
 
@@ -63,6 +67,7 @@ app.use('/api/v1', createSearchRouter(pool));
 app.use('/api/v1', createInterestRouter(pool));
 app.use('/api/v1', createDemandRouter(pool));
 app.use('/api/v1', createDeliveryRouter(pool));
+app.use('/api/v1', createDriverPhotoRouter(pool));
 app.use('/api/v1', createAdminRouter(pool));
 startInterestExpiryWorker(pool);
 
@@ -175,7 +180,24 @@ app.post('/api/v1/auth/register/company', async (req, res) => {
 });
 
 // Cadastro de motorista PJ
-app.post('/api/v1/auth/register/driver', async (req, res) => {
+app.post('/api/v1/auth/register/driver', optionalMultipartRaw('7mb'), async (req, res) => {
+  let requestBody = req.body;
+  let profilePhoto = null;
+  if (Buffer.isBuffer(requestBody)) {
+    const parsed = parseMultipartBody(requestBody, req.headers['content-type'] || '');
+    if (parsed.error) return res.status(400).json({ message: parsed.error });
+    requestBody = parsed.fields;
+    profilePhoto = requestBody.fotoPerfil || null;
+  }
+  if (requestBody?.veiculos && typeof requestBody.veiculos === 'string') {
+    try { requestBody.veiculos = JSON.parse(requestBody.veiculos); }
+    catch { return res.status(400).json({ message: 'A lista de veículos deve ser um JSON válido.' }); }
+  }
+  const allowedFields = new Set(['nomeCompleto', 'cpf', 'cnpj', 'telefone', 'email', 'senha', 'veiculos', 'fotoPerfil']);
+  if (!requestBody || typeof requestBody !== 'object' || Array.isArray(requestBody) ||
+      Object.keys(requestBody).some((key) => !allowedFields.has(key))) {
+    return res.status(400).json({ message: 'O cadastro contém campos não permitidos.' });
+  }
   const {
     nomeCompleto,
     cpf,
@@ -184,7 +206,10 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
     email,
     senha,
     veiculos = []
-  } = req.body;
+  } = requestBody;
+
+  const profileImage = profilePhoto ? inspectPrivateImage(profilePhoto) : null;
+  if (profilePhoto && !profileImage) return res.status(422).json({ message: 'A foto deve ser uma imagem JPG ou PNG válida de até 5 MB.', errors: { fotoPerfil: 'Selecione uma imagem válida.' } });
 
   if (
     typeof nomeCompleto !== 'string' || !nomeCompleto.trim() ||
@@ -218,6 +243,7 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
   }
 
   let connection;
+  let storedPhoto;
 
   try {
     connection = await pool.getConnection();
@@ -243,6 +269,8 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
       });
     }
 
+    if (profilePhoto) storedPhoto = await storePrivateImage(profilePhoto, driverPhotoStorageDir, profileImage);
+
     const senhaHash = await hashPassword(senha);
 
     const [usuarioResult] = await connection.execute(
@@ -253,14 +281,15 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
 
     const [motoristaResult] = await connection.execute(
       `INSERT INTO motorista (
-        usuario_id, nome, cpf, cnpj, telefone
-      ) VALUES (?, ?, ?, ?, ?)`,
+        usuario_id, nome, cpf, cnpj, telefone, foto_perfil_arquivo
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
       [
         usuarioResult.insertId,
         nomeCompleto.trim(),
         cpfNormalizado,
         cnpjNormalizado,
-        telefone?.trim() || null
+        telefone?.trim() || null,
+        storedPhoto?.filename || null
       ]
     );
 
@@ -282,13 +311,15 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
           tipoUsuario: 'MOTORISTA'
         },
         motorista: {
-          id: motoristaResult.insertId
+          id: motoristaResult.insertId,
+          fotoDisponivel: Boolean(storedPhoto)
         }
       }
     });
 
   } catch (error) {
     if (connection) await connection.rollback();
+    if (storedPhoto) await removePrivateFile(storedPhoto.path).catch(() => {});
 
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({

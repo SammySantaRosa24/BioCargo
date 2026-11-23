@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { deflateSync } from 'node:zlib';
 import { createDeliveryRouter } from '../src/routes/deliveryRoutes.js';
 
 function makePool() {
@@ -57,9 +58,23 @@ async function withApi(callback) {
   }
 }
 
+function validPng() {
+  const table = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const chunk = (type, data) => {
+    const name = Buffer.from(type);
+    const payload = Buffer.concat([name, data]);
+    let crc = 0xffffffff;
+    for (const byte of payload) crc = table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+    const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+    const checksum = Buffer.alloc(4); checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+    return Buffer.concat([length, payload, checksum]);
+  };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(1, 0); ihdr.writeUInt32BE(1, 4); ihdr[8] = 8; ihdr[9] = 6;
+  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.from([0,255,0,0,255]))), chunk('IEND', Buffer.alloc(0))]);
+}
 function completionForm() {
   const form = new FormData();
-  const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Buffer.alloc(8), Buffer.from('IEND'), Buffer.alloc(4)]);
+  const png = validPng();
   form.set('comprovante', new Blob([png], { type: 'image/png' }), 'entrega.png');
   form.set('dataEntrega', '2026-11-23');
   form.set('horarioEntrega', '14:25');
@@ -90,6 +105,21 @@ test('driver completes only an accepted in-progress service and authorized parti
   });
 });
 
+test('completion reports each required delivery field separately', async () => {
+  await withApi(async (base) => {
+    for (const field of ['dataEntrega', 'horarioEntrega', 'nomeRecebedor', 'observacoes']) {
+      const form = completionForm(); form.delete(field);
+      const response = await fetch(`${base}/api/v1/drivers/me/services/8/complete`, { method: 'POST', headers: { 'x-test-user': '3' }, body: form });
+      assert.equal(response.status, 422);
+      const body = await response.json();
+      assert.ok(body.errors[field], `expected validation error for ${field}`);
+    }
+    const whitespace = completionForm(); whitespace.set('observacoes', '   ');
+    const response = await fetch(`${base}/api/v1/drivers/me/services/8/complete`, { method: 'POST', headers: { 'x-test-user': '3' }, body: whitespace });
+    assert.equal(response.status, 422);
+    assert.ok((await response.json()).errors.observacoes);
+  });
+});
 test('completion rejects unauthenticated users, other drivers, missing fields, and invalid image data', async () => {
   await withApi(async (base) => {
     assert.equal((await fetch(`${base}/api/v1/drivers/me/services/8/complete`, { method: 'POST', body: completionForm() })).status, 401);

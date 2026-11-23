@@ -50,6 +50,7 @@ function CompanyDashboardLayout() {
         <nav aria-label="Navegação do dashboard">
           <NavLink to="/empresa" end>Visão geral</NavLink>
           <NavLink to="/empresa/demandas/nova">Publicar demanda</NavLink>
+          <NavLink to="/empresa/motoristas">Buscar motoristas</NavLink>
           <Link to="/">Voltar ao site</Link>
         </nav>
         <div className="company-sidebar__account">

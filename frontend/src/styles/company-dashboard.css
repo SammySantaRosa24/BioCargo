@@ -93,6 +93,41 @@
 .driver-proof-preview { width: min(100%, 440px); max-height: 320px; object-fit: contain; object-position: left center; border: 1px solid #dce5dc; border-radius: 4px; background: #f6f8f5; }
 .driver-proof-record { padding: 14px; border: 1px solid #dce5dc; border-radius: 4px; color: #52645a; font-size: 11px; line-height: 1.8; }
 .driver-proof-record a { color: var(--green); font-weight: 700; }
+.driver-photo-picker { display: grid; gap: 8px; }
+.driver-photo-preview { width: 128px; height: 128px; margin-top: 8px; border: 1px solid #dce5dc; border-radius: 50%; object-fit: cover; }
+.driver-identity-card { margin: 18px 0 30px; padding: 18px 22px; display: flex; align-items: center; gap: 16px; border: 1px solid #e2e9e2; border-radius: 5px; background: #fff; }
+.driver-identity-card h2 { margin: 4px 0 0; font: 700 20px var(--serif); color: #31473a; }
+.driver-identity-card .dashboard-button { margin-left: auto; }
+.driver-identity-avatar, .driver-profile-photo-wrap, .provider-card__avatar { width: 76px; height: 76px; flex: 0 0 76px; overflow: hidden; border-radius: 50%; color: var(--green); background: #e9f0e8; }
+.driver-identity-avatar { display: grid; place-items: center; font: 700 22px var(--serif); }
+.driver-identity-avatar img, .driver-profile-photo, .provider-card__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.driver-profile-card { display: flex; align-items: center; gap: 18px; }
+.driver-profile-photo-wrap { width: 112px; height: 112px; flex-basis: 112px; }
+.driver-profile-placeholder, .provider-card__avatar span { width: 100%; height: 100%; display: grid; place-items: center; color: var(--green); background: #e9f0e8; font: 700 28px var(--serif); }
+.driver-profile-photo-controls { display: grid; gap: 12px; }
+.driver-profile-form { margin-top: 18px; }
+.provider-search-form { display: flex; align-items: end; gap: 12px; margin: 18px 0 24px; }
+.provider-search-form .demand-field { flex: 1; }
+.provider-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.provider-card { min-width: 0; padding: 16px; display: flex; gap: 15px; border: 1px solid #e2e9e2; border-radius: 5px; background: #fff; }
+.provider-card__avatar { display: grid; place-items: center; font: 700 20px var(--serif); }
+.provider-card__body { min-width: 0; }
+.provider-card__body h3 { margin: 0 0 5px; color: #31473a; font: 700 16px var(--serif); }
+.provider-card__body > span, .provider-card__body p { color: #75837a; font-size: 11px; line-height: 1.6; }
+.provider-card__body p { margin: 8px 0 0; overflow-wrap: anywhere; }
+.admin-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.admin-filter-form { margin: 18px 0 24px; display: grid; grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(140px, 1fr)) auto; align-items: end; gap: 12px; }
+.admin-table-wrap { overflow-x: auto; border: 1px solid #e2e9e2; border-radius: 5px; background: #fff; }
+.admin-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; }
+.admin-table th, .admin-table td { padding: 13px 14px; border-bottom: 1px solid #e7ece7; vertical-align: middle; white-space: nowrap; }
+.admin-table th { color: #718078; background: #f7f9f6; font-size: 10px; }
+.admin-table td:first-child { white-space: normal; min-width: 190px; }
+.admin-table td:first-child strong, .admin-table td:first-child small { display: block; }
+.admin-table td:first-child small { margin-top: 4px; color: #7d8982; }
+.admin-row-actions { display: flex; align-items: center; gap: 10px; }
+.admin-row-actions a, .admin-row-actions button { border: 0; padding: 0; color: var(--green); background: transparent; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.admin-row-actions button:disabled { color: #8a958e; text-decoration: none; cursor: default; }
+.admin-user-photo { display: block; width: 120px; height: 120px; margin-top: 22px; border-radius: 50%; object-fit: cover; }
 
 @media (max-width: 900px) {
   .company-app { grid-template-columns: 205px minmax(0, 1fr); }
@@ -120,4 +155,9 @@
   .demand-field--full { grid-column: auto; }
   .interest-card { align-items: flex-start; flex-wrap: wrap; }
   .interest-card__actions { width: 100%; }
+  .provider-list { grid-template-columns: 1fr; }
+  .driver-profile-card { align-items: flex-start; flex-wrap: wrap; }
+  .provider-search-form { align-items: stretch; flex-direction: column; }
+  .admin-filter-form { grid-template-columns: 1fr; }
+  .admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

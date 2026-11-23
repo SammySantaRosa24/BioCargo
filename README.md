@@ -74,6 +74,17 @@ npm run dev
 
 Abra o endereço local informado pelo Vite (normalmente `http://localhost:5173`). O proxy de desenvolvimento encaminha requisições `/api` para `http://localhost:3000`; mantenha o backend em execução para usar cadastro e login integrados.
 
+### Banco MySQL local provisório
+
+Neste computador, o MySQL 8 pode ser executado sem iniciar o serviço Windows, usando a porta `3307` e os dados em `.local/mysql-data` (pasta ignorada pelo Git). O backend lê a conexão de `backend/.env`, também ignorado pelo Git. Para reiniciar o servidor local depois que ele for encerrado:
+
+```powershell
+cd backend
+npm run db:start:local
+```
+
+O schema isolado se chama `biocargo_test_local`; o `.env` local já está configurado para ele. Os dados de teste não são enviados ao repositório.
+
 Para gerar o build do frontend:
 
 ```bash
@@ -106,3 +117,12 @@ Credenciais exclusivas para testes locais:
 |---|---|---|---|---|
 | Empresa | `empresa.teste@biocargo.local` | `00000000000191` | — | `BioCargo@123` |
 | Motorista PJ | `motorista.teste@biocargo.local` | `00000000000272` | `00000000191` | `BioCargo@123` |
+
+## Painel administrativo e fotos de motorista
+
+- O painel `ADMIN` fica em `/admin` e usa dados reais da API; os endpoints administrativos aceitam apenas sessao `ADMIN`.
+- Para provisionar um administrador local, configure `NODE_ENV=development`, `ADMIN_EMAIL` e `ADMIN_PASSWORD` (minimo de 12 caracteres) no ambiente do terminal e execute `cd backend; npm run admin:provision`. O script nao promove usuarios existentes e nao grava credenciais no repositorio.
+- A foto de perfil do motorista e opcional, JPG/JPEG/PNG ate 5 MB. Os arquivos sao privados; configure `DRIVER_PHOTO_STORAGE_DIR` para o diretorio local de armazenamento. Empresas veem fotos apenas de prestadores disponiveis ou com interesse relacionado.
+- A conclusao de transporte exige comprovante de imagem, data, horario, nome de recebedor e observacoes nao vazias. A migracao `20261123_005_require_delivery_observations.sql` preenche registros antigos sem observacao com texto de legado antes de impor `NOT NULL`.
+- Para bancos existentes, aplique em ordem as migracoes `20261123_004_add_driver_profile_photo.sql` e `20261123_005_require_delivery_observations.sql` apos as migracoes anteriores. As migracoes versionadas usam o banco `biocargo`.
+- Contrato dos novos endpoints: [`docs/07_admin_fotos_conclusao.md`](docs/07_admin_fotos_conclusao.md).
