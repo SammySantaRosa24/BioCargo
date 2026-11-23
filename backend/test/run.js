@@ -7,5 +7,6 @@ import './demandRoutes.test.js';
 import './deliveryRoutes.test.js';
 import './driverPhotoRoutes.test.js';
 import './testUserSeed.test.js';
+import './testAdminSeed.test.js';
 import './brazilianDocuments.test.js';
 import './adminRoutes.test.js';

@@ -121,7 +121,7 @@ Credenciais exclusivas para testes locais:
 ## Painel administrativo e fotos de motorista
 
 - O painel `ADMIN` fica em `/admin` e usa dados reais da API; os endpoints administrativos aceitam apenas sessao `ADMIN`.
-- Para provisionar um administrador local, configure `NODE_ENV=development`, `ADMIN_EMAIL` e `ADMIN_PASSWORD` (minimo de 12 caracteres) no ambiente do terminal e execute `cd backend; npm run admin:provision`. O script nao promove usuarios existentes e nao grava credenciais no repositorio.
+- Para semear uma conta ADMIN local de teste, configure `NODE_ENV=development`, `ADMIN_EMAIL` e `ADMIN_PASSWORD` (minimo de 12 caracteres) no ambiente do terminal e execute `cd backend; npm run seed:admin:test`. O seed e idempotente para o mesmo e-mail, nunca promove contas existentes e nao grava credenciais no repositorio. `npm run admin:provision` continua disponivel para provisionamento pontual.
 - A foto de perfil do motorista e opcional, JPG/JPEG/PNG ate 5 MB. Os arquivos sao privados; configure `DRIVER_PHOTO_STORAGE_DIR` para o diretorio local de armazenamento. Empresas veem fotos apenas de prestadores disponiveis ou com interesse relacionado.
 - A conclusao de transporte exige comprovante de imagem, data, horario, nome de recebedor e observacoes nao vazias. A migracao `20261123_005_require_delivery_observations.sql` preenche registros antigos sem observacao com texto de legado antes de impor `NOT NULL`.
 - Para bancos existentes, aplique em ordem as migracoes `20261123_004_add_driver_profile_photo.sql` e `20261123_005_require_delivery_observations.sql` apos as migracoes anteriores. As migracoes versionadas usam o banco `biocargo`.
