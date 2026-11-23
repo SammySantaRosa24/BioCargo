@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuthenticatedUser } from '../middleware/authorization.js';
+import { isValidCnpj, normalizeCnpj } from '../utils/brazilianDocuments.js';
 
 const COMPANY_FIELDS = {
   razaoSocial: { column: 'razao_social', required: true, maxLength: 255 },
@@ -35,6 +36,16 @@ function buildUpdate(fields, body) {
   for (const key of keys) {
     const field = fields[key];
     const value = body[key];
+
+    if (key === 'cnpj') {
+      const normalized = normalizeCnpj(value);
+      if (!isValidCnpj(normalized)) {
+        return { error: 'CNPJ deve conter 14 numeros e digitos verificadores validos.', status: 422 };
+      }
+      assignments.push(`${field.column} = ?`);
+      values.push(normalized);
+      continue;
+    }
 
     if (field.boolean) {
       if (typeof value !== 'boolean') return { error: `${key} deve ser booleano.`, status: 400 };
@@ -84,11 +95,12 @@ export function createProfileRouter(pool) {
 
     try {
       if (Object.hasOwn(req.body, 'cnpj')) {
+        const normalizedCnpj = normalizeCnpj(req.body.cnpj);
         const [existing] = await pool.execute(
           `SELECT id FROM empresa WHERE cnpj = ? AND usuario_id <> ?
            UNION ALL
            SELECT id FROM motorista WHERE cnpj = ? LIMIT 1`,
-          [req.body.cnpj.trim(), req.authenticatedUser.id, req.body.cnpj.trim()]
+          [normalizedCnpj, req.authenticatedUser.id, normalizedCnpj]
         );
         if (existing.length > 0) return res.status(409).json({ message: 'Este CNPJ já está cadastrado.' });
       }
@@ -137,11 +149,12 @@ export function createProfileRouter(pool) {
         const cpf = req.body.cpf;
         const cnpj = req.body.cnpj;
         if (cnpj !== undefined) {
+          const normalizedCnpj = normalizeCnpj(cnpj);
           const [existingCnpj] = await pool.execute(
             `SELECT id FROM motorista WHERE cnpj = ? AND usuario_id <> ?
              UNION ALL
              SELECT id FROM empresa WHERE cnpj = ? LIMIT 1`,
-            [cnpj.trim(), req.authenticatedUser.id, cnpj.trim()]
+            [normalizedCnpj, req.authenticatedUser.id, normalizedCnpj]
           );
           if (existingCnpj.length > 0) return res.status(409).json({ message: 'Este CNPJ já está cadastrado.' });
         }

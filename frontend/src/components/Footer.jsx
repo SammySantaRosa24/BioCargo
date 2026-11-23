@@ -10,8 +10,8 @@ function Footer() {
           <p>Conexões que cuidam da vida em movimento.</p>
         </div>
         <div className="site-footer__links">
-          <a href="#para-empresas">Empresas</a>
-          <a href="#para-motoristas">Motoristas PJ</a>
+          <Link to="/empresas">Empresas</Link>
+          <Link to="/motoristas-pj">Motoristas PJ</Link>
           <Link to="/login">Entrar</Link>
           <Link to="/cadastro">Criar conta</Link>
         </div>

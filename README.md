@@ -85,3 +85,24 @@ npm run build
 Estão implementados no backend cadastro de empresa e motorista PJ, login com sessão persistida no MySQL, consulta da sessão atual, logout, verificação de saúde da API/conexão com banco, consulta/atualização dos próprios perfis, gestão de veículos e qualificações, disponibilidade, busca, interesses e inativação administrativa. Rotas protegidas exigem sessão ativa e o tipo de conta correspondente. O teste específico do logout ainda está pendente. Para origens diferentes no mesmo site, configure `CORS_ORIGINS` com origens exatas separadas por vírgula; sem configuração, use same-origin/Vite proxy. Uma implantação cross-site precisa de política adicional de cookie e CSRF.
 
 O contrato de endpoints e seus status está em [`docs/05_contrato_api_endpoints.md`](docs/05_contrato_api_endpoints.md). O estado e as instruções de transferência do backend estão em [`docs/06_handoff_backend_rafael.md`](docs/06_handoff_backend_rafael.md).
+
+### Dashboard da empresa
+
+Após login com uma conta `EMPRESA`, o frontend abre `/empresa`. O painel usa a sessão atual e dados reais da API. Em bancos já criados, aplique as migrações pendentes em ordem; a migração `20261123_002_create_demanda.sql` cria `demanda` e relaciona `interesse.demanda_id`.
+
+## Contas locais de teste
+
+O seed cria contas fictícias somente quando `NODE_ENV` está definido como `development` ou `test`. Configure `NODE_ENV=development` no `backend/.env` e, dentro da pasta `backend`, execute:
+
+```bash
+npm run seed:test
+```
+
+O seed é idempotente: se e-mail ou documento já estiver cadastrado, ele ignora a conta existente e não altera nem remove registros. As senhas são armazenadas com o mesmo hash `scrypt` usado pelo login. Nunca execute em produção.
+
+Credenciais exclusivas para testes locais:
+
+| Perfil | E-mail | CNPJ | CPF | Senha |
+|---|---|---|---|---|
+| Empresa | `empresa.teste@biocargo.local` | `00000000000191` | — | `BioCargo@123` |
+| Motorista PJ | `motorista.teste@biocargo.local` | `00000000000272` | `00000000191` | `BioCargo@123` |

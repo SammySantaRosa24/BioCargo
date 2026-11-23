@@ -47,3 +47,19 @@ npm run build
 ```
 
 No PowerShell do Windows, use `npm.cmd run build` se necessário. O resultado será gerado na pasta `dist/`.
+
+## Páginas e URLs
+
+O React Router disponibiliza cada página em uma URL própria:
+
+- `/` — página inicial
+- `/login` — entrar
+- `/cadastro` — escolha do perfil
+- `/cadastro/empresa` — cadastro de empresa
+- `/cadastro/motorista` — cadastro de motorista
+
+Os links entre páginas usam navegação do React Router. Em produção, configure o servidor para entregar `index.html` como fallback para essas rotas; assim, abrir ou atualizar diretamente uma URL de página continua funcionando.
+
+### Testes de documentos brasileiros
+
+Na pasta `frontend`, `npm test` valida a máscara progressiva do CNPJ, colagem sem pontuação, limite de 14 dígitos, edição/exclusão, dígitos verificadores e distinção do CPF. Na pasta `backend`, `npm test` inclui validação do seed de teste, hash de senha, idempotência e bloqueio de execução em produção.

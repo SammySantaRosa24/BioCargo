@@ -8,6 +8,18 @@ export function normalizeCnpj(value) {
   return String(value ?? '').replace(SEPARATOR_CHARACTERS, '').toUpperCase()
 }
 
+export function formatCnpj(value) {
+  const digits = String(value ?? '').replace(/\D/g, '').slice(0, 14)
+  let formatted = ''
+  for (let index = 0; index < digits.length; index += 1) {
+    if (index === 2 || index === 5) formatted += '.'
+    if (index === 8) formatted += '/'
+    if (index === 12) formatted += '-'
+    formatted += digits[index]
+  }
+  return formatted
+}
+
 function hasRepeatedCharacters(value) {
   return /^([A-Z0-9])\1+$/.test(value)
 }
@@ -49,7 +61,7 @@ function calculateCnpjDigit(base) {
 export function isValidCnpj(value) {
   const cnpj = normalizeCnpj(value)
 
-  if (!/^[A-Z0-9]{12}\d{2}$/.test(cnpj) || hasRepeatedCharacters(cnpj)) {
+  if (!/^\d{14}$/.test(cnpj) || hasRepeatedCharacters(cnpj)) {
     return false
   }
 

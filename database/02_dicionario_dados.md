@@ -72,9 +72,30 @@ Este documento descreve o esquema registrado em [`01_schema.sql`](./01_schema.sq
 | `renavam` | `VARCHAR(11)` | SIM | `UNIQUE` | RENAVAM do veículo; o SQL impede valores duplicados. |
 | `marca` | `VARCHAR(100)` | SIM | — | Marca do veículo. |
 | `modelo` | `VARCHAR(100)` | SIM | — | Modelo do veículo. |
+| `descricao` | `TEXT` | NÃO | `NULL` | Descrição opcional do veículo, incluindo características ou adaptações. |
 | `ano` | `INT` | SIM | — | Ano do veículo. O SQL não define faixa de valores. |
 | `disponivel` | `BOOLEAN` | SIM | `DEFAULT FALSE` | Indicador de disponibilidade operacional do veículo; assume `FALSE` quando não informado. |
 | `ativo` | `BOOLEAN` | SIM | `DEFAULT TRUE` | Indica se o veículo está ativo; veículos inativos permanecem no histórico e não aparecem em buscas de disponibilidade nem podem ser selecionados em novos interesses. |
+
+### `demanda`
+
+| Campo | Tipo | ObrigatÃ³rio | DescriÃ§Ã£o |
+|---|---|---|---|
+| `id` | `INT AUTO_INCREMENT` | SIM | Identificador da demanda. |
+| `empresa_id` | `INT` | SIM | Empresa proprietÃ¡ria da demanda. |
+| `titulo` | `VARCHAR(180)` | SIM | IdentificaÃ§Ã£o curta da necessidade. |
+| `descricao` | `TEXT` | SIM | InformaÃ§Ãµes sobre a carga e o transporte. |
+| `porte` | `ENUM('PEQUENO', 'MEDIO', 'GRANDE')` | SIM | Porte informado para o transporte. |
+| `tipo_transporte` | `VARCHAR(100)` | SIM | Tipo de transporte solicitado. |
+| `origem_cidade`, `origem_endereco` | `VARCHAR` | SIM | Local de retirada. |
+| `origem_complemento` | `VARCHAR(500)` | NÃƒO | InformaÃ§Ã£o adicional da retirada. |
+| `destino_cidade`, `destino_endereco` | `VARCHAR` | SIM | Local de entrega. |
+| `destino_complemento` | `VARCHAR(500)` | NÃƒO | InformaÃ§Ã£o adicional da entrega. |
+| `data_transporte` | `DATE` | SIM | Data prevista do transporte. |
+| `periodo_retirada` | `VARCHAR(100)` | NÃƒO | PerÃ­odo ou horÃ¡rio previsto para retirada. |
+| `valor_oferecido` | `DECIMAL(10,2)` | SIM | Valor oferecido pelo serviÃ§o. |
+| `requisitos` | `TEXT` | NÃƒO | Requisitos adicionais. |
+| `status` | `ENUM` | SIM | Estado operacional; alteraÃ§Ãµes sÃ£o explÃ­citas e nÃ£o hÃ¡ expiraÃ§Ã£o automÃ¡tica de demanda. |
 
 ### `interesse`
 
@@ -136,3 +157,7 @@ Essas regras de negócio não são todas garantidas pelo SQL. As restrições qu
 - O SQL não especifica ações `ON DELETE` ou `ON UPDATE` nas chaves estrangeiras. Também não especifica mecanismo de armazenamento, charset ou collation.
 - Embora `usuario.senha` seja obrigatória, o SQL não define hash, política de senha ou processo de autenticação. Esses comportamentos pertencem à aplicação/backend.
 - O SQL não contém uma tabela separada para administradores; o perfil `ADMIN` está representado em `usuario.tipo_usuario`.
+
+### `comprovante_entrega`
+
+Guarda os dados da conclusão: demanda, manifestação aceita, motorista, identificador aleatório do arquivo, MIME, tamanho, data e horário efetivos, recebedor, observações e data de envio. O arquivo binário permanece em diretório privado fora de conteúdo estático e é entregue somente por endpoint autenticado. Cada demanda e manifestação aceita pode ter no máximo um comprovante.

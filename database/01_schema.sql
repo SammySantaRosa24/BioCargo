@@ -52,6 +52,7 @@ CREATE TABLE veiculo (
     renavam VARCHAR(11) NOT NULL UNIQUE,
     marca VARCHAR(100) NOT NULL,
     modelo VARCHAR(100) NOT NULL,
+    descricao TEXT NULL,
     ano INT NOT NULL,
     disponivel BOOLEAN NOT NULL DEFAULT FALSE,
     ativo BOOLEAN NOT NULL DEFAULT TRUE,
@@ -60,11 +61,38 @@ CREATE TABLE veiculo (
         REFERENCES motorista(id)
 );
 
+CREATE TABLE demanda (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT NOT NULL,
+    titulo VARCHAR(180) NOT NULL,
+    descricao TEXT NOT NULL,
+    porte ENUM('PEQUENO', 'MEDIO', 'GRANDE') NOT NULL,
+    tipo_transporte VARCHAR(100) NOT NULL,
+    origem_cidade VARCHAR(120) NOT NULL,
+    origem_endereco VARCHAR(255) NOT NULL,
+    origem_complemento VARCHAR(500),
+    destino_cidade VARCHAR(120) NOT NULL,
+    destino_endereco VARCHAR(255) NOT NULL,
+    destino_complemento VARCHAR(500),
+    data_transporte DATE NOT NULL,
+    periodo_retirada VARCHAR(100),
+    valor_oferecido DECIMAL(10, 2) NOT NULL,
+    requisitos TEXT,
+    status ENUM('ABERTA', 'EM_NEGOCIACAO', 'EM_ANDAMENTO', 'FINALIZADA', 'CANCELADA', 'EXPIRADA') NOT NULL DEFAULT 'ABERTA',
+    data_criacao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_demanda_empresa_status_data (empresa_id, status, data_transporte),
+    CONSTRAINT fk_demanda_empresa
+        FOREIGN KEY (empresa_id)
+        REFERENCES empresa(id)
+);
+
 CREATE TABLE interesse (
     id INT AUTO_INCREMENT PRIMARY KEY,
     empresa_id INT NOT NULL,
     motorista_id INT NOT NULL,
     veiculo_id INT NULL,
+    demanda_id INT NULL,
     status ENUM('PENDENTE', 'ACEITO', 'RECUSADO', 'EXPIRADO', 'CANCELADO') NOT NULL DEFAULT 'PENDENTE',
     data_criacao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     data_limite_resposta DATETIME NOT NULL,
@@ -79,5 +107,29 @@ CREATE TABLE interesse (
         REFERENCES motorista(id),
     CONSTRAINT fk_interesse_veiculo
         FOREIGN KEY (veiculo_id)
-        REFERENCES veiculo(id)
+        REFERENCES veiculo(id),
+    CONSTRAINT fk_interesse_demanda
+        FOREIGN KEY (demanda_id)
+        REFERENCES demanda(id),
+    INDEX idx_interesse_demanda_data (demanda_id, data_criacao),
+    INDEX idx_interesse_demanda_motorista_status (demanda_id, motorista_id, status)
+);
+
+CREATE TABLE comprovante_entrega (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    demanda_id INT NOT NULL UNIQUE,
+    interesse_id INT NOT NULL UNIQUE,
+    motorista_id INT NOT NULL,
+    nome_arquivo CHAR(40) NOT NULL UNIQUE,
+    mime_type ENUM('image/jpeg', 'image/png') NOT NULL,
+    tamanho_bytes INT UNSIGNED NOT NULL,
+    data_entrega DATE NOT NULL,
+    horario_entrega TIME NOT NULL,
+    nome_recebedor VARCHAR(255) NOT NULL,
+    observacoes VARCHAR(2000) NULL,
+    enviado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_comprovante_demanda FOREIGN KEY (demanda_id) REFERENCES demanda(id),
+    CONSTRAINT fk_comprovante_interesse FOREIGN KEY (interesse_id) REFERENCES interesse(id),
+    CONSTRAINT fk_comprovante_motorista FOREIGN KEY (motorista_id) REFERENCES motorista(id),
+    INDEX idx_comprovante_motorista_enviado (motorista_id, enviado_em)
 );

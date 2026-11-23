@@ -98,7 +98,7 @@ test('creates, lists, updates, and changes availability of an owned vehicle', as
     assert.equal(created.status, 201);
     assert.equal((await created.json()).data.id, 55);
     const insert = pool.calls.find(({ sql }) => sql.startsWith('INSERT INTO veiculo'));
-    assert.deepEqual(insert.values, [7, 'ABC1D23', '12345678901', 'Volvo', 'VM', 2024, false]);
+    assert.deepEqual(insert.values, [7, 'ABC1D23', '12345678901', 'Volvo', 'VM', null, 2024, false]);
 
     const listed = await fetch(`${baseUrl}/api/v1/drivers/me/vehicles`, {
       headers: { 'x-test-user': '2' }

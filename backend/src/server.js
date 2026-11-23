@@ -2,8 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import pool from './config/database.js';
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
 import session from 'express-session';
 import MySQLStoreFactory from 'express-mysql-session';
 import { requireAuthenticatedUser } from './middleware/authorization.js';
@@ -13,13 +11,17 @@ import { createQualificationRouter } from './routes/qualificationRoutes.js';
 import { createSearchRouter } from './routes/searchRoutes.js';
 import { createInterestRouter, startInterestExpiryWorker } from './routes/interestRoutes.js';
 import { createAdminRouter } from './routes/adminRoutes.js';
+import { createDemandRouter } from './routes/demandRoutes.js';
+import { createDeliveryRouter } from './routes/deliveryRoutes.js';
+import { isValidCnpj, normalizeCnpj } from './utils/brazilianDocuments.js';
+import { hashPassword, verifyPassword } from './utils/passwords.js';
+import { isCnpjAvailable } from './utils/registrationValidation.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'SUBSTITUA_POR_UM_SEGREDO_ALEATORIO_LOCAL') {
   throw new Error('SESSION_SECRET must be configured before starting the API.');
 }
-const scrypt = promisify(scryptCallback);
 const MySQLStore = MySQLStoreFactory(session);
 if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 const configuredCorsOrigins = new Set(
@@ -59,31 +61,10 @@ app.use('/api/v1', createVehicleRouter(pool));
 app.use('/api/v1', createQualificationRouter(pool));
 app.use('/api/v1', createSearchRouter(pool));
 app.use('/api/v1', createInterestRouter(pool));
+app.use('/api/v1', createDemandRouter(pool));
+app.use('/api/v1', createDeliveryRouter(pool));
 app.use('/api/v1', createAdminRouter(pool));
 startInterestExpiryWorker(pool);
-
-// Gera o hash da senha
-async function hashPassword(password) {
-  const salt = randomBytes(16).toString('hex');
-  const derivedKey = await scrypt(password, salt, 64);
-
-  return `scrypt:${salt}:${derivedKey.toString('hex')}`;
-}
-
-// Verifica a senha
-async function verifyPassword(password, storedHash) {
-  const [algorithm, salt, hash] = storedHash.split(':');
-
-  if (algorithm !== 'scrypt' || !salt || !hash) {
-    return false;
-  }
-
-  const expectedHash = Buffer.from(hash, 'hex');
-  const derivedKey = await scrypt(password, salt, expectedHash.length);
-
-  return expectedHash.length === derivedKey.length &&
-    timingSafeEqual(expectedHash, derivedKey);
-}
 
 // Cadastro de empresa
 app.post('/api/v1/auth/register/company', async (req, res) => {
@@ -108,7 +89,10 @@ app.post('/api/v1/auth/register/company', async (req, res) => {
   }
 
   const emailNormalizado = email.trim().toLowerCase();
-  const cnpjNormalizado = cnpj.trim();
+  const cnpjNormalizado = normalizeCnpj(cnpj);
+  if (!isValidCnpj(cnpjNormalizado)) {
+    return res.status(422).json({ message: 'O CNPJ deve conter 14 números com dígitos verificadores válidos.' });
+  }
 
   let connection;
 
@@ -128,15 +112,7 @@ app.post('/api/v1/auth/register/company', async (req, res) => {
       });
     }
 
-    const [cnpjs] = await connection.execute(
-      `SELECT id FROM empresa WHERE cnpj = ?
-       UNION ALL
-       SELECT id FROM motorista WHERE cnpj = ?
-       LIMIT 1`,
-      [cnpjNormalizado, cnpjNormalizado]
-    );
-
-    if (cnpjs.length > 0) {
+    if (!(await isCnpjAvailable(connection, cnpjNormalizado))) {
       await connection.rollback();
       return res.status(409).json({
         message: 'Este CNPJ já está cadastrado.'
@@ -206,7 +182,8 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
     cnpj,
     telefone,
     email,
-    senha
+    senha,
+    veiculos = []
   } = req.body;
 
   if (
@@ -221,9 +198,24 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
     });
   }
 
+  if (!Array.isArray(veiculos) || veiculos.some((veiculo) => (
+    !veiculo ||
+    typeof veiculo.placa !== 'string' || !veiculo.placa.trim() || veiculo.placa.trim().length > 8 ||
+    typeof veiculo.renavam !== 'string' || !veiculo.renavam.trim() || veiculo.renavam.trim().length > 11 ||
+    typeof veiculo.marca !== 'string' || !veiculo.marca.trim() || veiculo.marca.trim().length > 100 ||
+    typeof veiculo.modelo !== 'string' || !veiculo.modelo.trim() || veiculo.modelo.trim().length > 100 ||
+    (veiculo.descricao != null && (typeof veiculo.descricao !== 'string' || veiculo.descricao.length > 1000)) ||
+    !Number.isInteger(veiculo.ano) || veiculo.ano < 1900 || veiculo.ano > new Date().getFullYear() + 1
+  ))) {
+    return res.status(400).json({ message: 'Confira os dados dos veículos informados.' });
+  }
+
   const emailNormalizado = email.trim().toLowerCase();
   const cpfNormalizado = cpf.trim();
-  const cnpjNormalizado = cnpj.trim();
+  const cnpjNormalizado = normalizeCnpj(cnpj);
+  if (!isValidCnpj(cnpjNormalizado)) {
+    return res.status(422).json({ message: 'O CNPJ deve conter 14 números com dígitos verificadores válidos.' });
+  }
 
   let connection;
 
@@ -243,15 +235,8 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
       });
     }
 
-    const [documentos] = await connection.execute(
-      `SELECT id FROM motorista WHERE cpf = ? OR cnpj = ?
-       UNION ALL
-       SELECT id FROM empresa WHERE cnpj = ?
-       LIMIT 1`,
-      [cpfNormalizado, cnpjNormalizado, cnpjNormalizado]
-    );
-
-    if (documentos.length > 0) {
+    const [cpfs] = await connection.execute('SELECT id FROM motorista WHERE cpf = ? LIMIT 1', [cpfNormalizado]);
+    if (cpfs.length > 0 || !(await isCnpjAvailable(connection, cnpjNormalizado))) {
       await connection.rollback();
       return res.status(409).json({
         message: 'CPF ou CNPJ já cadastrado.'
@@ -279,6 +264,15 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
       ]
     );
 
+    for (const veiculo of veiculos) {
+      await connection.execute(
+        `INSERT INTO veiculo (motorista_id, placa, renavam, marca, modelo, descricao, ano)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [motoristaResult.insertId, veiculo.placa.trim(), veiculo.renavam.trim(),
+          veiculo.marca.trim(), veiculo.modelo.trim(), veiculo.descricao?.trim() || null, veiculo.ano]
+      );
+    }
+
     await connection.commit();
 
     return res.status(201).json({
@@ -298,7 +292,7 @@ app.post('/api/v1/auth/register/driver', async (req, res) => {
 
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message: 'E-mail, CPF ou CNPJ já cadastrado.'
+        message: 'E-mail, CPF, CNPJ, placa ou RENAVAM já cadastrado.'
       });
     }
 

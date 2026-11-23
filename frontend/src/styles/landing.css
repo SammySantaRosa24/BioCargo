@@ -69,6 +69,12 @@
 .intro-strip__label { flex: none; color: #7c8e82; font-size: 8px; font-weight: 700; letter-spacing: 1.4px; }
 .intro-strip p { max-width: 630px; margin: 0; color: var(--ink); font: 500 19px/1.5 var(--serif); letter-spacing: -.5px; }
 
+.audience-hero { padding-block: 92px 84px; background: #eef3ec; border-bottom: 1px solid #e3eae0; }
+.audience-hero__inner { max-width: 800px; text-align: center; }
+.audience-hero h1 { margin: 19px auto 16px; color: var(--ink); font: 600 clamp(40px, 5vw, 62px)/1.12 var(--serif); letter-spacing: -2.8px; }
+.audience-hero p { max-width: 610px; margin: 0 auto 26px; color: var(--muted); font-size: 14px; line-height: 1.85; }
+.audience-benefits { padding-block: 84px 105px; }
+
 .benefits-section { padding-block: 108px; }
 .section-heading { max-width: 640px; margin: 0 auto 43px; text-align: center; }
 .section-heading .eyebrow { color: #9a805d; }
@@ -133,10 +139,11 @@
 
 @media (max-width: 650px) {
   .container { width: min(100% - 40px, 500px); }
-  .site-header__inner { min-height: 70px; gap: 12px; }
+  .site-header__inner { min-height: 70px; gap: 12px; flex-wrap: wrap; }
   .brand__mark { width: 30px; height: 30px; }
   .brand__name { font-size: 19px; }
-  .site-nav { display: none; }
+  .site-nav { order: 3; width: 100%; justify-content: center; gap: 25px; margin: 0; padding: 0 0 13px; }
+  .site-nav a { font-size: 12px; }
   .site-header__actions { gap: 0; }
   .button--text { padding-inline: 10px; font-size: 11px; }
   .button--small { min-height: 37px; padding-inline: 11px; gap: 7px; font-size: 10px; }
@@ -158,6 +165,10 @@
   .hero-bottom { display: none; }
   .intro-strip__inner { min-height: 120px; padding-block: 22px; align-items: flex-start; flex-direction: column; justify-content: center; gap: 8px; }
   .intro-strip p { font-size: 16px; }
+  .audience-hero { padding-block: 65px 58px; }
+  .audience-hero h1 { font-size: 39px; letter-spacing: -1.8px; }
+  .audience-hero p { font-size: 13px; }
+  .audience-benefits { padding-block: 66px 76px; }
   .benefits-section { padding-block: 75px; }
   .section-heading { margin-bottom: 31px; }
   .section-heading h2 { font-size: 31px; letter-spacing: -1.2px; }

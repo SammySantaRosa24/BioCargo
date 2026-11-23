@@ -2,10 +2,12 @@
 import { useState } from 'react'
 import FormField from '../FormField.jsx'
 import PasswordConfirmationFields from '../PasswordConfirmationFields.jsx'
-import { isValidCnpj } from '../../../utils/brazilianDocuments.js'
+import CnpjField from '../CnpjField.jsx'
+import { isValidCnpj, normalizeCnpj } from '../../../utils/brazilianDocuments.js'
 import { registerCompany } from '../../../services/api.js'
 
 function CompanyRegistrationForm() {
+  const [cnpjValue, setCnpjValue] = useState('')
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState(null)
@@ -32,7 +34,7 @@ function CompanyRegistrationForm() {
     const nextErrors = {}
 
     if (!isValidCnpj(cnpj)) {
-      nextErrors.cnpj = 'Informe um CNPJ válido, numérico ou alfanumérico.'
+      nextErrors.cnpj = 'CNPJ deve conter 14 numeros e digitos verificadores validos.'
     }
 
     if (password !== confirmPassword) {
@@ -52,7 +54,7 @@ function CompanyRegistrationForm() {
       await registerCompany({
         razaoSocial: razaoSocial.trim(),
         nomeFantasia: nomeFantasia.trim() || null,
-        cnpj: cnpj.trim(),
+        cnpj: normalizeCnpj(cnpj),
         telefone: telefone.trim() || null,
         email: email.trim().toLowerCase(),
         senha: password,
@@ -64,6 +66,7 @@ function CompanyRegistrationForm() {
       })
 
       form.reset()
+      setCnpjValue('')
     } catch (error) {
       setFeedback({
         type: 'error',
@@ -98,17 +101,7 @@ function CompanyRegistrationForm() {
           placeholder="Nome fantasia"
         />
 
-        <FormField
-          id="cnpj"
-          label="CNPJ"
-          required
-          inputMode="text"
-          autoCapitalize="characters"
-          spellCheck={false}
-          maxLength={18}
-          placeholder="00.000.000/0001-00"
-          error={errors.cnpj}
-        />
+        <CnpjField value={cnpjValue} onValueChange={setCnpjValue} error={errors.cnpj} />
 
         <FormField
           id="telefone"

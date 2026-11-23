@@ -4,5 +4,6 @@ dist/
 .env.*
 !.env.example
 coverage/
+backend/storage/private/delivery-proofs/
 .DS_Store
 Thumbs.db

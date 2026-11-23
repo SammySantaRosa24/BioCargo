@@ -191,3 +191,11 @@ erDiagram
 - Implementar inativação lógica e não expor exclusões físicas de usuários ou registros que precisem permanecer no histórico.
 - Respeitar as FKs e os `UNIQUE` existentes, tratando violações do banco como respostas de erro apropriadas.
 - Aplicar autorização por perfil e propriedade em todas as operações; a existência de uma FK não autoriza um usuário a acessar o registro relacionado.
+
+## Atualização: demandas de transporte
+
+A tabela `demanda` referencia sua empresa por `empresa_id`; uma empresa pode publicar várias demandas. `interesse.demanda_id` é opcional e vincula a manifestação a uma demanda específica, preservando interesses empresariais do fluxo anterior que não estão associados a uma publicação. As listas do dashboard e de demandas abertas são paginadas e usam índices por empresa/status/data e demanda/data.
+
+## Atualização: comprovante de entrega
+
+`comprovante_entrega` tem relação única com a demanda e com o interesse aceito e identifica o motorista que registrou a entrega. O arquivo fica no armazenamento privado local; a tabela guarda somente o identificador aleatório e metadados. As restrições `UNIQUE` impedem uma segunda conclusão para a mesma demanda ou interesse.

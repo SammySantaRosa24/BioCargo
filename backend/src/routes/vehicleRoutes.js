@@ -6,24 +6,30 @@ const VEHICLE_FIELDS = {
   renavam: { column: 'renavam', maxLength: 11 },
   marca: { column: 'marca', maxLength: 100 },
   modelo: { column: 'modelo', maxLength: 100 },
+  descricao: { column: 'descricao', maxLength: 1000, optional: true },
   ano: { column: 'ano', integer: true }
 };
 
-const VEHICLE_COLUMNS = 'id, placa, renavam, marca, modelo, ano, disponivel';
+const VEHICLE_COLUMNS = 'id, placa, renavam, marca, modelo, descricao, ano, disponivel';
 
 function parseVehicleFields(body, { creating = false } = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { error: 'O corpo da requisição deve ser um objeto JSON.', status: 400 };
   }
 
-  const allowed = creating ? [...Object.keys(VEHICLE_FIELDS), 'disponivel'] : Object.keys(VEHICLE_FIELDS);
+  const allowed = creating
+    ? [...Object.keys(VEHICLE_FIELDS), 'disponivel']
+    : Object.keys(VEHICLE_FIELDS);
   const keys = Object.keys(body);
   if (keys.length === 0 || keys.some((key) => !allowed.includes(key))) {
     return { error: 'Informe ao menos um campo permitido para o veículo.', status: 400 };
   }
 
   if (creating) {
-    const missing = Object.keys(VEHICLE_FIELDS).filter((key) => !Object.hasOwn(body, key));
+    const missing = Object.entries(VEHICLE_FIELDS)
+      .filter(([, field]) => !field.optional)
+      .map(([key]) => key)
+      .filter((key) => !Object.hasOwn(body, key));
     if (missing.length > 0) {
       return { error: `Campos obrigatórios ausentes: ${missing.join(', ')}.`, status: 400 };
     }
@@ -41,6 +47,11 @@ function parseVehicleFields(body, { creating = false } = {}) {
 
     const field = VEHICLE_FIELDS[key];
     const value = body[key];
+    if (field.optional && (value === null || (typeof value === 'string' && !value.trim()))) {
+      assignments.push(`${field.column} = ?`);
+      values.push(null);
+      continue;
+    }
     if (field.integer) {
       if (!Number.isInteger(value)) return { error: 'ano deve ser um número inteiro.', status: 400 };
     } else if (typeof value !== 'string') {
@@ -85,10 +96,10 @@ export function createVehicleRouter(pool) {
 
       const disponivel = Object.hasOwn(req.body, 'disponivel') ? req.body.disponivel : false;
       const [result] = await pool.execute(
-        `INSERT INTO veiculo (motorista_id, placa, renavam, marca, modelo, ano, disponivel)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO veiculo (motorista_id, placa, renavam, marca, modelo, descricao, ano, disponivel)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [drivers[0].id, req.body.placa.trim(), req.body.renavam.trim(), req.body.marca.trim(),
-          req.body.modelo.trim(), req.body.ano, disponivel]
+          req.body.modelo.trim(), req.body.descricao?.trim() || null, req.body.ano, disponivel]
       );
       const [rows] = await pool.execute(
         `SELECT ${VEHICLE_COLUMNS} FROM veiculo WHERE id = ? AND motorista_id = ? LIMIT 1`,

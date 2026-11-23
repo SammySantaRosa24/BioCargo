@@ -575,3 +575,31 @@ Não foram propostos endpoints de exclusão física.
 - Não há exclusão de qualificação/veículo proposta enquanto política de preservação e suporte de inativação não estiverem definidos.
 
 Este documento descreve parcialmente endpoints implementados e parcialmente propostas futuras; consulte a seção 2 para a lista e os status atuais.
+
+## Dashboard da empresa e demandas
+
+As rotas abaixo exigem sessão ativa e perfil `EMPRESA`; os IDs e a empresa proprietária são sempre validados no servidor.
+
+| Método e caminho | Função |
+|---|---|
+| `GET /api/v1/companies/me/demands/summary` | Resumo de demandas próprias por status. |
+| `GET /api/v1/companies/me/demands?grupo=ativas|historico&page=1&limit=10` | Lista paginada das demandas próprias ativas ou encerradas. |
+| `POST /api/v1/companies/me/demands` | Publica demanda com dados da carga, origem, destino, data e valor. |
+| `GET /api/v1/companies/me/demands/:id` | Consulta detalhe somente se a demanda pertencer à empresa autenticada. |
+| `PATCH /api/v1/companies/me/demands/:id` | Atualiza campos de uma demanda ainda `ABERTA`. |
+| `POST /api/v1/companies/me/demands/:id/cancel` | Cancela demanda aberta/em negociação sem manifestação aceita. |
+| `PATCH /api/v1/companies/me/demands/:id/status` | Aplica transição explícita permitida de status, sem expiração automática. |
+| `GET /api/v1/companies/me/demands/:id/interests` | Lista manifestações vinculadas à demanda própria. |
+| `PATCH /api/v1/companies/me/demands/:id/interests/:interestId` | Aceita ou recusa manifestação pendente. |
+| `GET /api/v1/drivers/me/demands` e `GET /api/v1/drivers/me/demands/:id` | Consulta demandas disponíveis para motorista autenticado. |
+| `POST /api/v1/demands/:id/interests` | Registra manifestação de interesse do motorista; aceita `veiculoId` opcional. |
+| `GET /api/v1/drivers/me/services/summary` | Indicadores privados do dashboard do motorista autenticado. |
+| `GET /api/v1/drivers/me/services?grupo=ativas|historico` | Serviços e histórico de interesses vinculados ao motorista. |
+| `POST /api/v1/drivers/me/services/:id/complete` | Finaliza serviço em andamento; multipart com `comprovante` (JPG/PNG até 5 MB), `dataEntrega` (YYYY-MM-DD), `horarioEntrega` (HH:mm), `nomeRecebedor` e `observacoes` opcional (até 2.000 caracteres). Exige motorista responsável e interesse aceito. Retorna 201 com status `FINALIZADA`; rejeita duplicidade com 409. |
+| `GET /api/v1/demands/:id/proof` | Imagem privada do comprovante; exige empresa proprietária, motorista responsável ou `ADMIN` autenticado. Retorna imagem inline, sem URL pública. |
+
+Os status de demanda são `ABERTA`, `EM_NEGOCIACAO`, `EM_ANDAMENTO`, `FINALIZADA`, `CANCELADA` e `EXPIRADA`. A empresa executa as transições até `EM_ANDAMENTO`; somente o motorista responsável conclui o serviço com comprovante obrigatório. A listagem `ativas` inclui abertas, em negociação e em andamento; `historico` inclui finalizadas, canceladas e expiradas.
+
+O comprovante é armazenado no diretório local privado configurado por `DELIVERY_PROOF_STORAGE_DIR` (ou `backend/storage/private/delivery-proofs`). Ele não fica no diretório público da aplicação nem é servido estaticamente. O banco guarda apenas nome aleatório, tipo, tamanho e metadados da entrega. Em produção, o diretório deve ser persistente e acessível apenas à conta do serviço. Execute `database/migrations/20261123_003_create_comprovante_entrega.sql` em instalações existentes.
+
+Em bancos existentes, execute `database/migrations/20261123_002_create_demanda.sql` uma vez, depois do schema e migrações anteriores. Para instalações novas, `database/01_schema.sql` já contém as tabelas e relações atualizadas.

@@ -96,11 +96,41 @@
   transition: border-color .2s, box-shadow .2s;
 }
 
+.auth-field textarea {
+  width: 100%;
+  min-height: 86px;
+  padding: 12px 13px;
+  resize: vertical;
+  border: 1px solid #dce5dd;
+  border-radius: 4px;
+  outline: none;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.auth-field textarea::placeholder { color: #a2ada6; }
+.auth-field textarea:hover { border-color: #b8cbbd; }
+.auth-field textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(18, 100, 79, .1); }
+
 .auth-field input::placeholder { color: #a2ada6; }
 .auth-field input:hover { border-color: #b8cbbd; }
 .auth-field input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(18, 100, 79, .1); }
 .auth-field input[aria-invalid='true'] { border-color: #bd644e; }
 .auth-field__error { color: #9c4937; font-size: 10px; line-height: 1.5; }
+
+.driver-vehicles { display: grid; gap: 16px; }
+.driver-vehicles__heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.driver-vehicles__heading h3 { margin: 0 0 5px; color: var(--ink); font: 700 15px var(--serif); }
+.driver-vehicles__heading p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.driver-vehicles__add, .driver-vehicle__remove { border: 1px solid #cddbd0; border-radius: 4px; color: var(--green); background: #fff; font: 700 11px 'DM Sans', Arial, sans-serif; cursor: pointer; }
+.driver-vehicles__add { min-height: 40px; padding: 0 13px; flex: none; }
+.driver-vehicles__add:hover, .driver-vehicle__remove:hover { border-color: var(--green); background: #f3f7f1; }
+.driver-vehicle { min-width: 0; margin: 0; padding: 18px; position: relative; border: 1px solid #e3e9e2; border-radius: 4px; }
+.driver-vehicle legend { padding-inline: 6px; color: var(--ink); font-size: 11px; font-weight: 700; }
+.driver-vehicle__remove { position: absolute; top: 5px; right: 12px; padding: 6px 9px; color: #9c4937; border-color: #ead8d2; }
+.driver-vehicle .auth-form__grid { padding-top: 7px; }
 
 .auth-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px 16px; }
 .auth-field--full { grid-column: 1 / -1; }
@@ -205,4 +235,6 @@
   .signup-option { min-height: 122px; padding: 17px; }
   .auth-form__grid { grid-template-columns: 1fr; }
   .auth-field--full { grid-column: auto; }
+  .driver-vehicles__heading { align-items: flex-start; flex-direction: column; }
+  .driver-vehicle { padding: 14px; }
 }

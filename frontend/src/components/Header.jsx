@@ -7,8 +7,8 @@ function Header() {
       <div className="container site-header__inner">
         <Brand />
         <nav className="site-nav" aria-label="Navegação principal">
-          <a href="#para-empresas">Empresas</a>
-          <a href="#para-motoristas">Motoristas PJ</a>
+          <Link to="/empresas">Empresas</Link>
+          <Link to="/motoristas-pj">Motoristas PJ</Link>
         </nav>
         <div className="site-header__actions">
           <Link className="button button--text" to="/login">Entrar</Link>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/auth/AuthLayout.jsx'
 import FormField from '../components/auth/FormField.jsx'
 import { loginUser } from '../services/api.js'
@@ -7,6 +7,7 @@ import { loginUser } from '../services/api.js'
 function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState(null)
+  const navigate = useNavigate()
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -21,10 +22,20 @@ function LoginPage() {
     setFeedback(null)
 
     try {
-      await loginUser({
+      const result = await loginUser({
         email: email.trim().toLowerCase(),
         senha,
       })
+
+      if (result.usuario.tipoUsuario === 'EMPRESA') {
+        navigate('/empresa', { replace: true })
+        return
+      }
+
+      if (result.usuario.tipoUsuario === 'MOTORISTA') {
+        navigate('/motorista', { replace: true })
+        return
+      }
 
       setFeedback({
         type: 'success',

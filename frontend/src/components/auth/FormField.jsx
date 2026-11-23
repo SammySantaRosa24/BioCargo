@@ -10,6 +10,9 @@ function FormField({
   autoCapitalize,
   spellCheck,
   error,
+  value,
+  onChange,
+  onKeyDown,
   wrapperClassName = '',
 }) {
   return (
@@ -22,6 +25,9 @@ function FormField({
       <input
         id={id}
         name={id}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
         type={type}
         autoComplete={autoComplete}
         placeholder={placeholder}

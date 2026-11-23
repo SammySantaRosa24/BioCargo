@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "seed:test": "node scripts/seedTestUsers.js",
     "test": "node test/run.js",
     "test:mysql": "node --test test/searchRoutes.mysql.test.js"
   },
